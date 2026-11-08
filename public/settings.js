@@ -1,6 +1,6 @@
 (() => {
   const status = document.getElementById('settingsStatus');
-  const fields = { pattern: 'subtle', fontSize: '14', grid: 'on', lang: 'python', slot: '1', name: 'iq-raw' };
+  const fields = { pattern: 'subtle', patternScope: 'app', fontSize: '14', grid: 'on', lang: 'python', slot: '1', name: 'iq-raw' };
   for (const [key, fallback] of Object.entries(fields)) {
     const control = document.getElementById(key);
     try { control.value = localStorage.getItem('iqraw.' + key) ?? fallback; } catch { control.value = fallback; }
@@ -11,7 +11,7 @@
         status.textContent = 'Settings saved.';
       } catch { status.textContent = 'Browser storage is unavailable. Changes will last until you leave this page.'; }
       if (key === 'fontSize') document.documentElement.style.setProperty('--editor-size', control.value + 'px');
-      if (key === 'pattern' || key === 'grid') document.documentElement.dataset[key] = control.value;
+      if (key === 'pattern' || key === 'patternScope' || key === 'grid') document.documentElement.dataset[key] = control.value;
     });
   }
   const theme = document.getElementById('theme');

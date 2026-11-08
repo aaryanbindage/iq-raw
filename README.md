@@ -45,7 +45,7 @@ To run it again later: `cd iq-raw && npm start`. To stop it: Ctrl+C in that Term
 
 Other buttons: **Open .py** and **Save .py** load and save the code box as a file (`.cpp` in C++ mode). **Programs on brain** lists what is stored. **Probe brain API** (Python) runs a small program that prints which calls the brain's Python offers.
 
-**Make it yours:** open **Settings → Appearance** for System, Light, Dark, Midnight, High Contrast, or the patterned Aurora, Blueprint, Circuit, and Sunset themes. Settings also includes theme previews, plain or patterned backgrounds, alignment dots, code text size, and saved language, slot, and name. Preferences save automatically in this browser.
+**Make it yours:** open **Settings → Appearance** for System, Light, Dark, Midnight, High Contrast, or the patterned Aurora, Blueprint, Circuit, and Sunset themes. Settings also includes theme previews, app-wide or canvas-only patterns with Off, Subtle, Bold, and Vivid strength, alignment dots, code text size, and saved language, slot, and name. Preferences save automatically in this browser.
 
 ### The blocks
 

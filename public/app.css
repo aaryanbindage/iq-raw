@@ -1,15 +1,15 @@
-/* Shared surfaces and theme patterns. Patterns stay behind the blocks. */
-:root { --editor-size:14px; --pattern:none; --pattern-size:auto; --shadow:0 8px 28px #18243b0a; }
-:root[data-theme="aurora"] { color-scheme:dark; --bg:#081b24; --panel:#102c35; --ink:#e2fff6; --muted:#a2c9c7; --line:#31535b; --accent:#78e6c4; --accentink:#08251d; --bad:#ffaaaa; --good:#85edb3; --code:#07191f; --codeink:#e2fff6; --pattern:radial-gradient(ellipse at 15% 5%, #39d6b522, transparent 55%),radial-gradient(ellipse at 90% 85%, #9b71f82a, transparent 60%),repeating-linear-gradient(125deg,transparent 0 38px,#78e6c408 39px 40px); }
-:root[data-theme="blueprint"] { color-scheme:dark; --bg:#0a2040; --panel:#102c50; --ink:#edf7ff; --muted:#aecbe5; --line:#3a6087; --accent:#9bd7ff; --accentink:#08233f; --bad:#ffb4b4; --good:#8ce7bf; --code:#081c35; --codeink:#edf7ff; --pattern:linear-gradient(#91caff18 1px,transparent 1px),linear-gradient(90deg,#91caff18 1px,transparent 1px),linear-gradient(#91caff0a 1px,transparent 1px),linear-gradient(90deg,#91caff0a 1px,transparent 1px); --pattern-size:120px 120px,120px 120px,24px 24px,24px 24px; }
-:root[data-theme="circuit"] { color-scheme:dark; --bg:#101b16; --panel:#192b23; --ink:#ebffe9; --muted:#adc9b5; --line:#3f5b48; --accent:#b9ec83; --accentink:#162409; --bad:#ffb2a5; --good:#94efa9; --code:#0b1711; --codeink:#ebffe9; --pattern:radial-gradient(circle at 12px 12px,#b9ec8330 2px,transparent 3px),linear-gradient(90deg,transparent 11px,#b9ec8312 11px 13px,transparent 13px),linear-gradient(transparent 11px,#b9ec8312 11px 13px,transparent 13px),repeating-linear-gradient(45deg,transparent 0 56px,#b9ec8309 57px 58px); --pattern-size:72px 72px,72px 72px,72px 72px,auto; }
-:root[data-theme="sunset"] { color-scheme:light; --bg:#f5e9e2; --panel:#fff8f2; --ink:#422a36; --muted:#775863; --line:#ddbec0; --accent:#a83b56; --accentink:#fff; --bad:#a32127; --good:#286842; --code:#2b202d; --codeink:#fff0e8; --pattern:radial-gradient(ellipse at 90% 0,#f5ae7930,transparent 60%),repeating-radial-gradient(ellipse at 0 100%,transparent 0 36px,#b9547510 37px 38px,transparent 39px 58px); }
-body { font-size:14px; letter-spacing:-.01em; background-image:var(--pattern); background-size:var(--pattern-size); background-attachment:fixed; }
-:root[data-pattern="off"] body { background-image:none; }
+/* Shared surfaces and theme patterns. Pattern strength never changes text opacity. */
+:root { --editor-size:14px; --pattern-strength:12%; --pattern-fine:5%; --pattern-glow:16%; --pattern:radial-gradient(circle at 1px 1px,color-mix(in srgb,var(--accent) var(--pattern-strength),transparent) 1px,transparent 1.5px),repeating-linear-gradient(135deg,transparent 0 47px,color-mix(in srgb,var(--accent) var(--pattern-fine),transparent) 48px 49px); --pattern-size:24px 24px,auto; --active-pattern:var(--pattern); --shadow:0 8px 28px #18243b0a; }
+:root[data-theme="aurora"] { --pattern-size:auto; color-scheme:dark; --bg:#081b24; --panel:#102c35; --ink:#e2fff6; --muted:#a2c9c7; --line:#31535b; --accent:#78e6c4; --accentink:#08251d; --bad:#ffaaaa; --good:#85edb3; --code:#07191f; --codeink:#e2fff6; --pattern:radial-gradient(ellipse at 15% 5%, color-mix(in srgb,#39d6b5 var(--pattern-glow),transparent), transparent 55%),radial-gradient(ellipse at 90% 85%, color-mix(in srgb,#9b71f8 var(--pattern-glow),transparent), transparent 60%),repeating-linear-gradient(125deg,transparent 0 38px,color-mix(in srgb,#78e6c4 var(--pattern-fine),transparent) 39px 40px); }
+:root[data-theme="blueprint"] { color-scheme:dark; --bg:#0a2040; --panel:#102c50; --ink:#edf7ff; --muted:#aecbe5; --line:#3a6087; --accent:#9bd7ff; --accentink:#08233f; --bad:#ffb4b4; --good:#8ce7bf; --code:#081c35; --codeink:#edf7ff; --pattern:linear-gradient(color-mix(in srgb,#91caff var(--pattern-strength),transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,#91caff var(--pattern-strength),transparent) 1px,transparent 1px),linear-gradient(color-mix(in srgb,#91caff var(--pattern-fine),transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,#91caff var(--pattern-fine),transparent) 1px,transparent 1px); --pattern-size:120px 120px,120px 120px,24px 24px,24px 24px; }
+:root[data-theme="circuit"] { color-scheme:dark; --bg:#101b16; --panel:#192b23; --ink:#ebffe9; --muted:#adc9b5; --line:#3f5b48; --accent:#b9ec83; --accentink:#162409; --bad:#ffb2a5; --good:#94efa9; --code:#0b1711; --codeink:#ebffe9; --pattern:radial-gradient(circle at 12px 12px,color-mix(in srgb,#b9ec83 var(--pattern-glow),transparent) 2px,transparent 3px),linear-gradient(90deg,transparent 11px,color-mix(in srgb,#b9ec83 var(--pattern-strength),transparent) 11px 13px,transparent 13px),linear-gradient(transparent 11px,color-mix(in srgb,#b9ec83 var(--pattern-strength),transparent) 11px 13px,transparent 13px),repeating-linear-gradient(45deg,transparent 0 56px,color-mix(in srgb,#b9ec83 var(--pattern-fine),transparent) 57px 58px); --pattern-size:72px 72px,72px 72px,72px 72px,auto; }
+:root[data-theme="sunset"] { --pattern-size:auto; color-scheme:light; --bg:#f5e9e2; --panel:#fff8f2; --ink:#422a36; --muted:#775863; --line:#ddbec0; --accent:#a83b56; --accentink:#fff; --bad:#a32127; --good:#286842; --code:#2b202d; --codeink:#fff0e8; --pattern:radial-gradient(ellipse at 90% 0,color-mix(in srgb,#f5ae79 var(--pattern-glow),transparent),transparent 60%),repeating-radial-gradient(ellipse at 0 100%,transparent 0 36px,color-mix(in srgb,#b95475 var(--pattern-strength),transparent) 37px 38px,transparent 39px 58px); }
+body { font-size:14px; letter-spacing:-.01em; background-attachment:fixed; }
+
 header { display:block; padding:0; border:0; background:var(--panel); }
 .appbar { display:flex; align-items:center; gap:16px; padding:17px 24px; border-bottom:1px solid var(--line); }
-.appbar { background-image:var(--pattern); background-size:var(--pattern-size); }
-:root[data-pattern="off"] .appbar { background-image:none; }
+
+
 .brand { display:flex; align-items:center; gap:12px; margin-right:auto; }
 .brand-mark { width:38px; height:38px; display:grid; place-items:center; background:var(--accent); color:var(--accentink); border-radius:12px; font:800 15px ui-monospace,monospace; letter-spacing:-2px; }
 header h1 { font-size:19px; letter-spacing:-.04em; margin:0; }
@@ -41,9 +41,9 @@ main { gap:16px; padding:12px 24px 20px; grid-template-columns:minmax(0,1.2fr) m
 .panel-heading h2 { font-size:13px; margin:0; font-weight:650; }
 .panel-heading span { color:var(--muted); font-size:12px; }
 #blocklyDiv { flex:1; height:auto; min-height:0; position:relative; }
-#blocklyDiv .blocklySvg { background-image:var(--pattern); background-size:var(--pattern-size); }
+#blocklyDiv .blocklySvg { background-image:var(--active-pattern); background-size:var(--pattern-size); }
 /* Keep Blockly's SVG grid transparent so the decorative layers show through. */
-:root[data-pattern="off"] #blocklyDiv .blocklySvg { background-image:none; }
+
 :root[data-grid="off"] #blocklyDiv .blocklyMainBackground { fill:transparent; }
 #blocklyDiv .blocklyMainBackground { stroke:none; }
 :root:not([data-theme="light"]):not([data-theme="sunset"]) #blocklyDiv .blocklyZoom image,
@@ -86,8 +86,19 @@ main { gap:16px; padding:12px 24px 20px; grid-template-columns:minmax(0,1.2fr) m
 .swatch { height:64px; display:block; border-radius:5px; margin-bottom:8px; }
 .swatch.aurora { background:radial-gradient(ellipse at 10% 0,#39d6b555,transparent 65%),radial-gradient(ellipse at 100% 100%,#9b71f855,transparent 70%),repeating-linear-gradient(125deg,transparent 0 16px,#78e6c412 17px 18px),#102c35; }
 .swatch.blueprint { background:linear-gradient(#91caff35 1px,transparent 1px),linear-gradient(90deg,#91caff35 1px,transparent 1px),#102c50; background-size:16px 16px; }
-.swatch.circuit { background:radial-gradient(circle at 8px 8px,#b9ec8370 2px,transparent 3px),linear-gradient(90deg,transparent 7px,#b9ec8330 7px 9px,transparent 9px),linear-gradient(transparent 7px,#b9ec8330 7px 9px,transparent 9px),#192b23; background-size:32px 32px; }
+.swatch.circuit { background:radial-gradient(circle at 8px 8px,#b9ec8370 2px,transparent 3px),linear-gradient(90deg,transparent 7px,color-mix(in srgb,#b9ec83 var(--pattern-glow),transparent) 7px 9px,transparent 9px),linear-gradient(transparent 7px,color-mix(in srgb,#b9ec83 var(--pattern-glow),transparent) 7px 9px,transparent 9px),#192b23; background-size:32px 32px; }
 .swatch.sunset { background:radial-gradient(ellipse at 100% 0,#f5ae7955,transparent 70%),repeating-radial-gradient(ellipse at 0 100%,transparent 0 12px,#b9547520 13px 14px,transparent 15px 20px),#fff8f2; }
 @media(max-width:1100px) { .toolbar { gap:10px; } .control-group + .control-group { padding-left:0; border:0; } .appbar { flex-wrap:wrap; } }
 @media(max-width:800px) { html,body { height:auto; min-height:100%; } .appbar { padding:14px 16px; gap:10px; } .brand { flex:1 1 100%; } .toolbar { padding:10px 16px; } .connection { padding:10px 16px 0; } main { padding:12px 16px 16px; grid-template-columns:1fr; grid-template-rows:520px 600px; } .settings-layout { display:block; padding:20px 16px; } .settings-nav { position:static; flex-direction:row; margin-bottom:20px; flex-wrap:wrap; } .setting-row { align-items:flex-start; flex-direction:column; gap:10px; } .setting-row select,.setting-row input { width:100%; max-width:none; } .settings-card { padding:18px; } }
 @media(prefers-reduced-motion:reduce) { button { transition:none; } }
+
+/* Coverage and strength are independent, so a vivid canvas can have quiet chrome. */
+:root[data-pattern="bold"] { --pattern-strength:26%; --pattern-fine:13%; --pattern-glow:34%; }
+:root[data-pattern="vivid"] { --pattern-strength:40%; --pattern-fine:23%; --pattern-glow:52%; }
+:root[data-pattern="off"] { --active-pattern:none; }
+:root[data-pattern-scope="app"] body,
+:root[data-pattern-scope="app"] :is(.appbar,.toolbar,.panel-heading,.bar,.panel-foot,.settings-card,#log),
+:root[data-pattern-scope="app"] #blocklyDiv .blocklyToolboxDiv {
+  background-image:var(--active-pattern);
+  background-size:var(--pattern-size);
+}
