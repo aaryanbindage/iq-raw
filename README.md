@@ -19,7 +19,7 @@ Then open http://localhost:5174 in Chrome, Safari or Firefox.
 
 You need [Homebrew](https://brew.sh) for the first line. If you already have Node, git and VS Code, only the last three lines matter.
 
-**One manual step for C++ mode:** open VS Code, press Cmd+Shift+P, type "New Project" and pick the VEX one (or use the VEX icon in the sidebar), and make an **IQ (2nd gen) C++** project once. That makes the extension download VEX's C++ SDK and compiler, which iq-raw reuses. Python mode does not need this.
+**One manual step, needed for both languages:** installing the extension is not enough. It downloads its tools (including `vexcom`, which sends programs to the brain) the first time you use it. Open VS Code, press Cmd+Shift+P, type "New Project", pick the VEX one (or use the VEX icon in the sidebar), and make an **IQ (2nd gen) C++** project once. Wait for the downloads to finish. For Python mode this makes `vexcom` appear; for C++ mode it also gets VEX's C++ SDK and compiler. If iq-raw says "vexcom was not found", this step is what is missing.
 
 On Apple Silicon Macs, VEX's `vexcom` is an Intel program, so macOS may ask to install Rosetta the first time.
 

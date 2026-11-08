@@ -13,30 +13,60 @@ const HOME_DIR = path.join(os.homedir(), '.iq-raw', 'vexcom');
 const MAX_CODE = 200000;
 
 // ---- finding vexcom ----
-// VEX ships vexcom inside its VS Code extension (without the executable bit). Copy it, with its libusb, to our own folder.
+// VEX ships vexcom inside its VS Code extension (without the executable bit, and one folder per platform). Copy it, with
+// its libusb, to our own folder. Looks in VS Code and the other editors that share its extension format.
+const EXE = process.platform === 'win32' ? 'vexcom.exe' : 'vexcom';
+const PLATFORM_DIR = process.platform === 'darwin' ? 'osx' : process.platform === 'win32' ? 'win32' : `linux-${{ x64: 'x64', arm64: 'arm64', arm: 'arm32' }[process.arch] || process.arch}`;
+const EXT_ROOTS = ['.vscode', '.vscode-insiders', '.vscode-oss', '.cursor', '.windsurf', '.vscode-server'].map((d) => path.join(os.homedir(), d, 'extensions'));
+// The extension downloads vexcom into its own storage folder (tools/vexcom/<version>/<platform>) the first time it runs;
+// older versions bundled it inside the extension folder instead.
+const STORE_ROOTS = [
+  path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'vexrobotics.vexcode', 'tools', 'vexcom'),
+  path.join(os.homedir(), 'Library', 'Application Support', 'Code - Insiders', 'User', 'globalStorage', 'vexrobotics.vexcode', 'tools', 'vexcom'),
+  path.join(os.homedir(), '.config', 'Code', 'User', 'globalStorage', 'vexrobotics.vexcode', 'tools', 'vexcom'),
+  ...(process.env.APPDATA ? [path.join(process.env.APPDATA, 'Code', 'User', 'globalStorage', 'vexrobotics.vexcode', 'tools', 'vexcom')] : []),
+];
+let lastSearch = '';
+
+function installVexcom(src) {
+  fs.mkdirSync(HOME_DIR, { recursive: true });
+  for (const f of fs.readdirSync(src)) fs.copyFileSync(path.join(src, f), path.join(HOME_DIR, f));
+  fs.chmodSync(path.join(HOME_DIR, EXE), 0o755);
+  return path.join(HOME_DIR, EXE);
+}
+
 function findVexcom() {
   if (process.env.VEXCOM) return process.env.VEXCOM;
-  const own = path.join(HOME_DIR, 'vexcom');
+  const own = path.join(HOME_DIR, EXE);
   if (fs.existsSync(own)) return own;
-  const extRoot = path.join(os.homedir(), '.vscode', 'extensions');
-  let dirs = [];
-  try { dirs = fs.readdirSync(extRoot); } catch { /* no VS Code */ }
-  for (const d of dirs) {
-    const src = path.join(extRoot, d, 'resources', 'tools', 'vexcom', 'osx');
-    if (!fs.existsSync(path.join(src, 'vexcom'))) continue;
-    fs.mkdirSync(HOME_DIR, { recursive: true });
-    for (const f of fs.readdirSync(src)) fs.copyFileSync(path.join(src, f), path.join(HOME_DIR, f));
-    fs.chmodSync(own, 0o755);
-    return own;
+  for (const root of STORE_ROOTS) {
+    let versions = [];
+    try { versions = fs.readdirSync(root).filter((d) => fs.existsSync(path.join(root, d, PLATFORM_DIR, EXE))); } catch { continue; /* not downloaded */ }
+    versions.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    if (versions.length) return installVexcom(path.join(root, versions[versions.length - 1], PLATFORM_DIR));
   }
+  const seen = [];
+  for (const root of EXT_ROOTS) {
+    let dirs = [];
+    try { dirs = fs.readdirSync(root); } catch { continue; /* editor not installed */ }
+    for (const d of dirs) {
+      if (/vex/i.test(d)) seen.push(path.join(root, d));
+      const src = path.join(root, d, 'resources', 'tools', 'vexcom', PLATFORM_DIR);
+      if (!fs.existsSync(path.join(src, EXE))) continue;
+      return installVexcom(src);
+    }
+  }
+  lastSearch = `Looked in: ${STORE_ROOTS.filter((r) => r).join(', ')} and in resources/tools/vexcom/${PLATFORM_DIR} of ${EXT_ROOTS.join(', ')}. VEX-looking extension folders found: ${seen.length ? seen.join(', ') : 'none'}.`;
   return null;
 }
+
+const notFound = () => `vexcom was not found. Install the VS Code extension "VEX" by VEX Robotics (id vexrobotics.vexcode). Then open VS Code once and create a new VEX project (Cmd+Shift+P, "New Project"), so the extension downloads its tools, and retry. Or set VEXCOM=/path/to/${EXE}.\n${lastSearch}`;
 
 // ---- running tools, one command at a time (one USB device, and builds share the template) ----
 let queue = Promise.resolve();
 function run(bin, args, { timeoutMs = 30000, cwd, env } = {}) {
   const job = queue.then(() => new Promise((resolve) => {
-    if (!bin) return resolve({ code: -1, out: 'vexcom was not found. Install the VEX extension in VS Code, or set VEXCOM=/path/to/vexcom.' });
+    if (!bin) return resolve({ code: -1, out: notFound() });
     const p = spawn(bin, args, { cwd: cwd || path.dirname(bin), env: env || process.env });
     let out = '';
     const timer = setTimeout(() => { out += '\n[timed out]'; p.kill(); }, timeoutMs);
@@ -215,4 +245,4 @@ const server = http.createServer(async (req, res) => {
 if (require.main === module) {
   server.listen(PORT, '127.0.0.1', () => console.log(`iq-raw: open http://localhost:${PORT}  (vexcom: ${findVexcom() || 'NOT FOUND'})`));
 }
-module.exports = { server, vexcom };
+module.exports = { server, vexcom, findVexcom };
