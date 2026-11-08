@@ -73,12 +73,33 @@ function run(bin, args, { timeoutMs = 30000, cwd, env } = {}) {
     p.stdout.on('data', (d) => (out += d));
     p.stderr.on('data', (d) => (out += d));
     p.on('error', (e) => { clearTimeout(timer); resolve({ code: -1, out: String(e) }); });
-    p.on('close', (code) => { clearTimeout(timer); resolve({ code, out: out.replace(/\r/g, '\n') }); });
+    p.on('close', (code, signal) => {
+      clearTimeout(timer);
+      resolve({ code: code ?? -1, signal, out: out.replace(/\r/g, '\n') });
+    });
   }));
   queue = job.catch(() => {});
   return job;
 }
-const vexcom = (args, timeoutMs = 30000) => run(findVexcom(), args, { timeoutMs });
+// Exit meanings from VEX's extension. Some failures print only the version banner.
+const VEX_ERRORS = {
+  1: 'operation failed; no specific cause reported',
+  2: 'brain communication failed',
+  3: 'version error',
+  4: 'command error',
+  5: 'device not found',
+  6: 'serial port error; close other VEX apps and check the USB connection',
+  7: 'invalid command parameter',
+  8: 'VEXos error',
+};
+const vexcom = async (args, timeoutMs = 30000) => {
+  const r = await run(findVexcom(), args, { timeoutMs });
+  if (r.code !== 0) {
+    const detail = r.signal ? `terminated by ${r.signal}` : `exited with code ${r.code} (${VEX_ERRORS[r.code] || 'tool could not complete the command'})`;
+    r.out = `${r.out.trim()}\n\nvexcom ${detail}.`.trim();
+  }
+  return r;
+};
 
 // ---- the C++ toolchain: VEX's SDK, clang and make, downloaded by the VEX VS Code extension ----
 const STORAGE = process.env.VEX_STORAGE || path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'vexrobotics.vexcode');
@@ -131,18 +152,14 @@ async function download({ code, slot, name, run: runAfter, lang = 'python', time
       file = path.join(dir, 'main.py');
       fs.writeFileSync(file, code);
     }
-    // same flags VEX's own extension uses: --name, --slot, --write, optional --run, --progress
-    const base = ['--slot', String(slot), '--write', file, '--progress'];
+    // Match VEX's extension, including structured error output. Be verbose on
+    // the first attempt rather than repeating a possibly partially completed transfer.
+    const base = ['--slot', String(slot), '--write', file, '--json', '--progress', '--verbose'];
     if (runAfter) base.push('--run');
     let r = await vexcom(['--name', name, ...base], timeoutMs);
     // older vexcom builds do not know --name
     if (r.code !== 0 && /unknown|unrecognized|invalid option|usage/i.test(r.out)) r = await vexcom(base, timeoutMs);
-    if (r.code !== 0 && r.code !== -1 && !/\[timed out\]/.test(r.out)) {
-      // vexcom's own failure message is often empty, so try once more in verbose mode to show what it was doing
-      const v = await vexcom(['-v', '--name', name, ...base], timeoutMs);
-      r = { code: v.code, out: `${r.out.trim()}\n\n--- retried in verbose mode ---\n${v.out.trim()}` };
-      if (v.code !== 0 && lang !== 'cpp') r.out += '\n\nIf this is the first Python program on this brain, press "Install Python VM" and try again.';
-    }
+    if (r.code === 1 && lang !== 'cpp') r.out += '\n\nFor Python, also check that the Python VM has been installed on this brain using "Install Python VM".';
     return r;
   } finally {
     if (dir) fs.rmSync(dir, { recursive: true, force: true });

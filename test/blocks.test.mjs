@@ -125,5 +125,67 @@ if (sdkThere) {
   assert.equal(bad.ok, false);
   console.log('ok - C++ pin program compiles with the VEX toolchain');
 } else console.log('skip - VEX C++ SDK not installed');
+
+// Exercise downloads against a fake tool; these tests never touch a USB brain.
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'iqraw-vexcom-test-'));
+const originalVexcom = process.env.VEXCOM;
+try {
+  const tool = path.join(fixture, 'vexcom');
+  const calls = path.join(fixture, 'calls.jsonl');
+  fs.writeFileSync(tool, `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const file = args[args.indexOf('--write') + 1];
+fs.appendFileSync(process.env.IQRAW_TEST_CALLS, JSON.stringify({ args, file, source: fs.readFileSync(file, 'utf8') }) + '\\n');
+if (process.env.IQRAW_TEST_MODE === 'signal') process.kill(process.pid, 'SIGTERM');
+else if (process.env.IQRAW_TEST_MODE === 'old' && args.includes('--name')) { console.error('unknown option --name'); process.exitCode = 7; }
+else if (process.env.IQRAW_TEST_MODE === 'silent') { console.error('Device: /dev/tty.usbmodem101\\nvexcom utility V1.0.2b2'); process.exitCode = 1; }
+else if (process.env.IQRAW_TEST_MODE === 'port') process.exitCode = 6;
+else console.log('{"status":0,"message":"Download complete"}');
+`);
+  fs.chmodSync(tool, 0o755);
+  process.env.VEXCOM = tool;
+  process.env.IQRAW_TEST_CALLS = calls;
+  const attempts = () => fs.readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse);
+  const send = async (mode, run = false) => {
+    process.env.IQRAW_TEST_MODE = mode;
+    return (await post({ code: 'print("hello")\r\n', slot: 8, name: 'test robot', lang: 'python', run })).json();
+  };
+  const failed = await send('silent');
+  assert.equal(failed.ok, false);
+  assert.match(failed.out, /vexcom exited with code 1/);
+  assert.equal(attempts().length, 1, 'ambiguous failure must not repeat the transfer');
+  const first = attempts()[0];
+  for (const flag of ['--name', '--slot', '--write', '--json', '--progress', '--verbose']) assert.ok(first.args.includes(flag));
+  assert.ok(!first.args.includes('--run'));
+  assert.ok(!first.args.includes('--timer'));
+  assert.equal(first.args[first.args.indexOf('--slot') + 1], '8');
+  assert.equal(first.source, 'print("hello")\n');
+  assert.ok(!fs.existsSync(first.file), 'temporary code should be cleaned after failure');
+  const port = await send('port');
+  assert.match(port.out, /code 6 \(serial port error/);
+  const killed = await send('signal');
+  assert.equal(killed.ok, false);
+  assert.match(killed.out, /terminated by SIGTERM/);
+  const beforeOld = attempts().length;
+  const old = await send('old', true);
+  assert.equal(old.ok, true);
+  const fallback = attempts().slice(beforeOld);
+  assert.equal(fallback.length, 2);
+  assert.ok(fallback[0].args.includes('--name'));
+  assert.ok(!fallback[1].args.includes('--name'));
+  assert.ok(fallback[1].args.includes('--run'));
+  assert.ok(!fs.existsSync(fallback[1].file), 'temporary code should be cleaned after success');
+  console.log('ok - download flags, silent errors, signals, compatibility and cleanup (mock tool)');
+} finally {
+  if (originalVexcom === undefined) delete process.env.VEXCOM;
+  else process.env.VEXCOM = originalVexcom;
+  delete process.env.IQRAW_TEST_CALLS;
+  delete process.env.IQRAW_TEST_MODE;
+  fs.rmSync(fixture, { recursive: true, force: true });
+}
 server.close();
 
