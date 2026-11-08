@@ -14,3 +14,10 @@ Needs the VEX extension in VS Code (it ships `vexcom`; on first start it is copi
 - The server listens on 127.0.0.1 only and checks Host and Origin, since it can overwrite programs on the brain.
 
 `npm test` checks the block generators and server guards without a brain.
+
+## Testing with a real brain (nothing here has run on hardware yet)
+Everything so far is built from VEX's own headers, templates and `vexcom` help, and checked only by compiling. For someone with an IQ (2nd gen) brain:
+1. Install VS Code with the VEX extension, create one IQ (2nd gen) C++ project (so the SDK downloads), then `git clone https://github.com/knittingCat/iq-raw && cd iq-raw && npm install && npm start`.
+2. Plug the brain in by USB, open http://localhost:5174, press **Check brain**. Then in Python mode press **Install Python VM**, **Probe brain API**, and **Download and run** the starter program.
+3. In C++ mode press **Build only**, then **Download and run**. Try the **write high to prong of port N** block (it calls `vexGenericDigitalEnable(port, 0)` then `vexGenericDigitalOutput(port, 0, value)`; both zeros are guesses) with a multimeter or LED on that port, and tell us what the options and pin numbers need to be.
+4. Report anything that errors, with the text from the log box at the bottom right.

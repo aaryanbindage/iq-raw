@@ -161,6 +161,7 @@
   };
 
   // bare pins on a smart port, through the SDK's own pin calls. The SDK headers do not say what `target` and `options` mean.
+  F.iq_prong_write = (b, g) => `vexGenericDigitalEnable(${portIndex(b)}, 0);\nvexGenericDigitalOutput(${portIndex(b)}, 0, ${b.getFieldValue('LEVEL') === 'True' ? 1 : 0});\n`;
   F.iq_pin_enable = (b, g) => `vexGenericDigitalEnable(${portIndex(b)}, ${Number(b.getFieldValue('OPTIONS')) >>> 0});\n`;
   F.iq_pin_write = (b, g) => `vexGenericDigitalOutput(${portIndex(b)}, ${Number(b.getFieldValue('TARGET')) >>> 0}, ${b.getFieldValue('LEVEL') === 'True' ? 1 : 0});\n`;
   F.iq_pin_read = (b, g) => [`vexGenericDigitalInput(${portIndex(b)}, ${Number(b.getFieldValue('TARGET')) >>> 0})`, g.ORDER_ATOMIC];

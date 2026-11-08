@@ -74,6 +74,7 @@ const sdkThere = (await (await fetch('http://127.0.0.1:5199/api/build', { method
 if (sdkThere) {
   const wsPins = new Blockly.Workspace();
   Blockly.serialization.workspaces.load({ blocks: { languageVersion: 0, blocks: [chain([
+    { type: 'iq_prong_write', fields: { LEVEL: 'False', PORT: '12' } },
     { type: 'iq_pin_enable', fields: { PORT: '3', OPTIONS: 1 } },
     { type: 'iq_pin_write', fields: { TARGET: 0, PORT: '3', LEVEL: 'True' } },
     { type: 'iq_print', inputs: { TEXT: { block: { type: 'iq_pin_digital', fields: { PORT: '3' } } } } },
@@ -81,7 +82,7 @@ if (sdkThere) {
     { type: 'iq_print', inputs: { TEXT: { block: { type: 'iq_pin_read', fields: { TARGET: 1, PORT: '5' } } } } },
     { type: 'iq_motor_spin_for', fields: { PORT: '1', DIR: 'FORWARD' }, inputs: { DEG: n(90) } },
     { type: 'iq_port_distance', },
-  ].slice(0, 6))] } }, wsPins);
+  ].slice(0, 7))] } }, wsPins);
   const good = Blockly.Cpp.workspaceToCode(wsPins);
   const ok = await (await fetch('http://127.0.0.1:5199/api/build', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: good }) })).json();
   assert.ok(ok.ok, 'pin program should compile:\n' + ok.out + '\n' + good);

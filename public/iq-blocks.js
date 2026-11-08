@@ -28,6 +28,7 @@
     { type: 'iq_port_distance', message0: 'port %1 distance (mm)', args0: [{ type: 'field_dropdown', name: 'PORT', options: PORTS }], output: 'Number', colour: COLOUR.port },
     { type: 'iq_port_write', message0: 'port %1 device %2 call %3', args0: [{ type: 'field_dropdown', name: 'PORT', options: PORTS }, { type: 'field_dropdown', name: 'DEV', options: DEVICES }, { type: 'field_input', name: 'CALL', text: 'set_color(Color.RED)' }], inputsInline: true, previousStatement: null, nextStatement: null, colour: COLOUR.port, tooltip: 'Make a device on a port and call any method on it. Type the call in the language you are using: set_color(Color.GREEN) in Python, setColor(color::green) in C++.' },
     // bare pins on a smart port: C++ only (the Python on the brain has no pin calls). Press "Build only" in C++ mode to check them.
+    { type: 'iq_prong_write', message0: 'write %1 to prong of port %2', args0: [{ type: 'field_dropdown', name: 'LEVEL', options: [['high', 'True'], ['low', 'False']] }, { type: 'field_dropdown', name: 'PORT', options: PORTS }], previousStatement: null, nextStatement: null, colour: COLOUR.pin, tooltip: 'C++ only. One write to one of the 12 ports: enable (options 0), then output (pin 0). Both numbers are guesses, so use the pin blocks to tune them on a real brain.' },
     { type: 'iq_pin_enable', message0: 'pins on port %1 enable options %2', args0: [{ type: 'field_dropdown', name: 'PORT', options: PORTS }, { type: 'field_number', name: 'OPTIONS', value: 0, min: 0 }], previousStatement: null, nextStatement: null, colour: COLOUR.pin, tooltip: 'C++ only. vexGenericDigitalEnable(port, options). The SDK does not say what the options mean.' },
     { type: 'iq_pin_write', message0: 'pin %1 on port %2 write %3', args0: [{ type: 'field_number', name: 'TARGET', value: 0, min: 0 }, { type: 'field_dropdown', name: 'PORT', options: PORTS }, { type: 'field_dropdown', name: 'LEVEL', options: [['high', 'True'], ['low', 'False']] }], previousStatement: null, nextStatement: null, colour: COLOUR.pin, tooltip: 'C++ only. vexGenericDigitalOutput(port, pin, value).' },
     { type: 'iq_pin_read', message0: 'pin %1 on port %2 read', args0: [{ type: 'field_number', name: 'TARGET', value: 0, min: 0 }, { type: 'field_dropdown', name: 'PORT', options: PORTS }], output: 'Number', colour: COLOUR.pin, tooltip: 'C++ only. vexGenericDigitalInput(port, pin).' },
@@ -87,6 +88,7 @@
   };
   // pins exist only in the C++ SDK; in Python mode the block leaves a comment so the program still runs
   const pinNote = (g) => { base(g); return '# pin blocks need C++ mode\n'; };
+  F.iq_prong_write = (b, g) => pinNote(g);
   F.iq_pin_enable = (b, g) => pinNote(g);
   F.iq_pin_write = (b, g) => pinNote(g);
   F.iq_pin_read = (b, g) => { base(g); return ['0', g.ORDER_ATOMIC]; };
@@ -125,7 +127,7 @@
         { kind: 'block', type: 'iq_port_distance' },
       ] },
       { kind: 'category', name: 'Pins (C++)', colour: String(COLOUR.pin), contents: [
-        { kind: 'block', type: 'iq_pin_enable' }, { kind: 'block', type: 'iq_pin_write' }, { kind: 'block', type: 'iq_pin_read' },
+        { kind: 'block', type: 'iq_prong_write' }, { kind: 'block', type: 'iq_pin_enable' }, { kind: 'block', type: 'iq_pin_write' }, { kind: 'block', type: 'iq_pin_read' },
         { kind: 'block', type: 'iq_pin_digital' }, { kind: 'block', type: 'iq_pin_analog' },
       ] },
       { kind: 'category', name: 'Controller', colour: String(COLOUR.control), contents: [{ kind: 'block', type: 'iq_axis' }, { kind: 'block', type: 'iq_button' }] },
