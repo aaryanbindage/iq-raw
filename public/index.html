@@ -26,6 +26,14 @@
   main { flex: 1; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); min-height: 0; }
   #blocks { min-height: 0; border-right: 1px solid var(--line); }
   #blocklyDiv { width: 100%; height: 100%; }
+  /* Blockly's light toolbox otherwise inherits pale text from our dark theme. */
+  #blocklyDiv .blocklyToolboxDiv { background: var(--panel); color: var(--ink); }
+  #blocklyDiv .blocklyTreeRow { height: 32px; line-height: 32px; padding-right: 12px; }
+  #blocklyDiv .blocklyTreeLabel { color: var(--ink); font: 600 17px/1.4 system-ui, -apple-system, sans-serif; }
+  /* Override Blockly's inline category background; keep the coloured border. */
+  #blocklyDiv .blocklyTreeSelected { background-color: var(--line) !important; }
+  #blocklyDiv .blocklyTreeRow:not(.blocklyTreeSelected):hover { background-color: var(--bg); }
+  #blocklyDiv .blocklyToolboxDiv:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   aside { display: flex; flex-direction: column; min-height: 0; }
   .bar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
   #code { flex: 1; min-height: 0; width: 100%; resize: none; border: 0; outline: 0; padding: 10px 12px; background: var(--code); color: var(--codeink); font: 13px/1.5 ui-monospace, Menlo, monospace; tab-size: 4; white-space: pre; overflow: auto; }
@@ -114,7 +122,20 @@
   $('name').onchange = () => store.set('name', $('name').value);
 
   // ---- blocks and code ----
-  const ws = Blockly.inject('blocklyDiv', { toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
+  // CSS variables keep Blockly in sync with the app's system colour scheme.
+  const theme = Blockly.Theme.defineTheme('iqraw', {
+    base: Blockly.Themes.Classic,
+    componentStyles: {
+      workspaceBackgroundColour: 'var(--panel)',
+      toolboxBackgroundColour: 'var(--panel)',
+      toolboxForegroundColour: 'var(--ink)',
+      flyoutBackgroundColour: 'var(--bg)',
+      flyoutForegroundColour: 'var(--ink)',
+      flyoutOpacity: 1,
+      scrollbarColour: 'var(--muted)',
+    },
+  });
+  const ws = Blockly.inject('blocklyDiv', { theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
   const code = $('code');
   let manual = store.get('manual', '0') === '1';
   const generate = () => (lang === 'cpp' ? Blockly.Cpp : Blockly.Python).workspaceToCode(ws);
