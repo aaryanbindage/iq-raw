@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node test/blocks.test.mjs && node test/catalog.test.mjs"
+    "test": "node test/blocks.test.mjs && node test/catalog.test.mjs && node test/math.test.mjs"
   },
   "dependencies": {
     "blockly": "10.4.3"

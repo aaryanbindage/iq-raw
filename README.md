@@ -53,6 +53,16 @@ Other buttons: **Open .py** and **Save .py** load and save the code box as a fil
 
 ### The blocks
 
+**Advanced math:** open **Math** for arithmetic (√, powers, nth roots, rounding and logarithms), all six trigonometric and inverse trigonometric functions, all six hyperbolic and inverse hyperbolic functions, comparisons and inequalities, and 25 constants including π, τ, e, φ, ∞, Euler–Mascheroni, Catalan, Apéry and Feigenbaum constants. Trigonometric functions use radians; angle-conversion blocks are included. `acot` uses the principal range (0, π). Invalid real domains and finite-input overflow produce NaN; use the finite/NaN test block to handle them.
+
+**Calculus and series:** these are numerical approximations, not symbolic algebra. Plug the **x (bound variable)** block into the function input of an integral, derivative, sum, product, or graph. The default function for calculus is x². Definite integrals use composite Simpson’s rule with 2–1024 steps; derivatives use a central difference with a configurable positive step (first or second derivative). Sums (∑) and products (Π) include both integer endpoints and allow at most 4096 terms. Infinite endpoints are unsupported. An empty sum is 0; an empty product is 1. Very small derivative steps can lose accuracy on the brain’s floating-point hardware.
+
+**Complex numbers:** create a + bi or the imaginary unit i, then add, subtract, multiply, divide, raise to a complex power, conjugate, or apply complex √, exp, ln, sin, cos, tan, sinh and cosh. Use Re(), Im(), magnitude, and argument to get real values, or the dedicated complex print block to show a complex result. Complex values have dedicated set/get variable blocks, separate from ordinary numeric variables. Python uses the brain’s documented `cmath` library; C++ uses `std::complex`.
+
+**Graph on the brain:** clear the screen, choose a pen color, draw graph axes, then use **Math → Graphing → graph y = …**. Its default function is sin(x). Set the x and y ranges to fit your function. The graph samples all 160 screen columns; off-screen or undefined values break the line, and large jumps are not joined. This is a sampled plot, so very narrow features and some discontinuities can still be missed. Graphing resets the origin and clipping to the full 160 × 108 screen.
+
+**Brain drawing:** pixels, lines, rectangles, circles, outline ellipses, arcs and triangles, pen/fill colors (including custom RGB), pen width, fonts, positioned text, drawing origin, clipping, clear and render. Screen coordinates start at the top left: x = 0–159, y = 0–107. Positive arc angles run clockwise from the right. Drawing calls follow VEX’s [IQ2 screen API](https://api.vex.com/iq2/home/python/Screen.html); math libraries follow its [MicroPython library list](https://api.vex.com/iq2/home/python/Micropython_libraries.html). Math is numerically tested and the C++ is compiled against VEX’s SDK; these additions have not been tested on a physical brain.
+
 Start a program with **Events → when started**, then attach blocks underneath it. Those blocks run once in order when the program starts. Existing programs without a start block still work; use one start stack to keep execution order clear.
 
 | Category | What it does |
