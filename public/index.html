@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IQ Raw</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#fff; --ink:#1c2230; --muted:#5d6678; --line:#d5d9e2; --accent:#1f6feb; --bad:#b42318; --good:#1a7f37; --code:#0f1420; --codeink:#e6e9f0; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --panel:#1b1f29; --ink:#e6e9f0; --muted:#98a1b3; --line:#2f3646; --accent:#5b9cff; --bad:#ff7b72; --good:#56d364; --code:#0b0e14; } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; }
+  label { color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  select, input[type=text], button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; }
+  input[type=text] { width: 130px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .spacer { flex: 1; }
+  #brain { font-size: 13px; color: var(--muted); }
+  #brain.ok { color: var(--good); }
+  #brain.bad { color: var(--bad); }
+  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); min-height: 0; }
+  #blocks { min-height: 0; border-right: 1px solid var(--line); }
+  #blocklyDiv { width: 100%; height: 100%; }
+  aside { display: flex; flex-direction: column; min-height: 0; }
+  .bar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #code { flex: 1; min-height: 0; width: 100%; resize: none; border: 0; outline: 0; padding: 10px 12px; background: var(--code); color: var(--codeink); font: 13px/1.5 ui-monospace, Menlo, monospace; tab-size: 4; white-space: pre; overflow: auto; }
+  #code[readonly] { opacity: .85; }
+  #log { height: 30%; min-height: 90px; margin: 0; padding: 8px 12px; overflow: auto; background: var(--panel); border-top: 1px solid var(--line); font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+  #log .err { color: var(--bad); } #log .okk { color: var(--good); }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #blocks { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>IQ Raw</h1>
+  <label>Language <select id="lang"><option value="python">Python</option><option value="cpp">C++</option></select></label>
+  <label>Slot <select id="slot"></select></label>
+  <label>Name <input type="text" id="name" maxlength="32" value="iq-raw"></label>
+  <button id="send" class="primary" title="Send the code to the slot and run it">Download and run</button>
+  <button id="sendOnly" title="Send the code to the slot without running it">Download</button>
+  <button id="run" title="Run the program already in this slot">Run slot</button>
+  <button id="stop">Stop</button>
+  <button id="build" title="Compile the C++ and show any errors, without sending it" hidden>Build only</button>
+  <button id="vm" title="Put the Python VM on the brain. Needed once, and again after a VEXos update.">Install Python VM</button>
+  <span class="spacer"></span>
+  <span id="brain">Brain: checking...</span>
+  <button id="refresh">Check brain</button>
+</header>
+<main>
+  <section id="blocks"><div id="blocklyDiv"></div></section>
+  <aside>
+    <div class="bar">
+      <label><input type="checkbox" id="manual"> Edit code by hand</label>
+      <span class="spacer"></span>
+      <button id="open">Open .py</button>
+      <button id="save">Save .py</button>
+      <button id="programs">Programs on brain</button>
+      <button id="probe" title="Run a tiny program that prints what the brain's Python offers (pins, devices)">Probe brain API</button>
+      <input type="file" id="file" accept=".py,.cpp,text/x-python,text/plain" hidden>
+    </div>
+    <textarea id="code" spellcheck="false" readonly></textarea>
+    <pre id="log"></pre>
+  </aside>
+</main>
+<script src="/vendor/blockly/blockly_compressed.js"></script>
+<script src="/vendor/blockly/blocks_compressed.js"></script>
+<script src="/vendor/blockly/python_compressed.js"></script>
+<script src="/vendor/blockly/msg/en.js"></script>
+<script src="/iq-blocks.js"></script>
+<script src="/iq-cpp.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('iqraw.' + k); return v == null ? d : v; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('iqraw.' + k, v); } catch { /* storage blocked */ } },
+  };
+  const STARTERS = {
+    python: 'from vex import *\n\nbrain = Brain()\n\nbrain.screen.print("Hello IQ")\n',
+    cpp: '#include "vex.h"\n\nusing namespace vex;\n\nvex::brain Brain;\n\nint main() {\n    Brain.Screen.print("Hello IQ");\n\n    while (true) {\n        this_thread::sleep_for(10);\n    }\n}\n',
+  };
+  let lang = store.get('lang', 'python') === 'cpp' ? 'cpp' : 'python';
+  $('lang').value = lang;
+
+  // ---- log ----
+  const log = (text, cls) => { const s = document.createElement('span'); if (cls) s.className = cls; s.textContent = text + '\n'; $('log').append(s); $('log').scrollTop = 1e9; };
+  const api = async (path, body) => {
+    const r = await fetch('/api/' + path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    return j;
+  };
+  const busy = (on) => document.querySelectorAll('header button').forEach((b) => (b.disabled = on));
+  async function action(label, path, body) {
+    busy(true); log('> ' + label);
+    try {
+      const j = await api(path, body);
+      log(j.out.trim() || '(no output)', j.ok ? 'okk' : 'err');
+      if (!j.ok) log(label + ' failed.', 'err');
+      return j;
+    } catch (e) { log(String(e.message || e), 'err'); } finally { busy(false); }
+  }
+
+  // ---- slots ----
+  for (let i = 1; i <= 8; i++) $('slot').add(new Option('Slot ' + i, i));
+  $('slot').value = store.get('slot', '1');
+  $('name').value = store.get('name', 'iq-raw');
+  $('slot').onchange = () => store.set('slot', $('slot').value);
+  $('name').onchange = () => store.set('name', $('name').value);
+
+  // ---- blocks and code ----
+  const ws = Blockly.inject('blocklyDiv', { toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
+  const code = $('code');
+  let manual = store.get('manual', '0') === '1';
+  const generate = () => (lang === 'cpp' ? Blockly.Cpp : Blockly.Python).workspaceToCode(ws);
+
+  function applyMode() {
+    $('manual').checked = manual;
+    code.readOnly = !manual;
+  }
+  function refreshFromBlocks() {
+    if (manual) return;
+    code.value = generate() || STARTERS[lang];
+    store.set('code.' + lang, code.value);
+  }
+  try { const saved = store.get('ws', ''); if (saved) Blockly.serialization.workspaces.load(JSON.parse(saved), ws); } catch { /* bad saved workspace */ }
+  code.value = manual ? store.get('code.' + lang, STARTERS[lang]) : generate() || STARTERS[lang];
+  applyMode();
+  const showLang = () => { $('vm').hidden = lang === 'cpp'; $('probe').hidden = lang === 'cpp'; $('build').hidden = lang !== 'cpp'; };
+  showLang();
+  ws.addChangeListener((e) => {
+    if (e.isUiEvent) return;
+    store.set('ws', JSON.stringify(Blockly.serialization.workspaces.save(ws)));
+    refreshFromBlocks();
+  });
+  $('manual').onchange = () => {
+    if ($('manual').checked) { manual = true; }
+    else if (confirm('Go back to blocks? Anything you typed in the code box is replaced by what the blocks make.')) { manual = false; refreshFromBlocks(); }
+    store.set('manual', manual ? '1' : '0');
+    applyMode();
+  };
+  code.addEventListener('input', () => store.set('code.' + lang, code.value));
+  $('lang').onchange = () => {
+    if (manual) store.set('code.' + lang, code.value);
+    lang = $('lang').value;
+    store.set('lang', lang);
+    code.value = manual ? store.get('code.' + lang, STARTERS[lang]) : generate() || STARTERS[lang];
+    showLang();
+  };
+  code.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || code.readOnly) return;
+    e.preventDefault();
+    const s = code.selectionStart;
+    code.setRangeText('    ', s, code.selectionEnd, 'end');
+    store.set('code.' + lang, code.value);
+  });
+
+  // ---- file open / save ----
+  $('save').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([code.value], { type: 'text/x-python' }));
+    a.download = ($('name').value.trim() || 'iq-raw').replace(/[^\w.-]+/g, '_') + (lang === 'cpp' ? '.cpp' : '.py');
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+  $('open').onclick = () => $('file').click();
+  $('file').onchange = async () => {
+    const f = $('file').files[0]; if (!f) return;
+    code.value = await f.text(); manual = true; store.set('manual', '1'); store.set('code.' + lang, code.value); applyMode();
+    $('file').value = '';
+  };
+
+  // ---- brain ----
+  async function checkBrain() {
+    const el = $('brain'); el.className = ''; el.textContent = 'Brain: checking...';
+    try {
+      const j = await api('info');
+      if (j.ok) {
+        const i = j.info || {};
+        const bits = [i.product || i.device || i.type, i.vexos || i.version || i.vexos_version].filter(Boolean);
+        el.textContent = 'Brain: connected' + (bits.length ? ' (' + bits.join(', ') + ')' : '');
+        el.className = 'ok';
+      } else { el.textContent = 'Brain: not found. Plug it in by USB and turn it on.'; el.className = 'bad'; log(j.out.trim(), 'err'); }
+    } catch (e) { el.textContent = 'Brain: ' + e.message; el.className = 'bad'; }
+  }
+  $('refresh').onclick = checkBrain;
+  $('programs').onclick = async () => { busy(true); log('> programs'); try { const j = await api('programs'); log(j.out.trim() || '(none)', j.ok ? 'okk' : 'err'); } catch (e) { log(e.message, 'err'); } finally { busy(false); } };
+  const slot = () => Number($('slot').value);
+  const send = (run) => async () => {
+    if (!code.value.trim()) return log('Nothing to send.', 'err');
+    await action(`download to slot ${slot()}${run ? ' and run' : ''}`, 'download', { code: code.value, slot: slot(), name: $('name').value, run, lang });
+  };
+  $('send').onclick = send(true);
+  $('sendOnly').onclick = send(false);
+  $('probe').onclick = () => action('probe brain API (runs a test program in slot 8)', 'probe', { slot: 8 });
+  $('build').onclick = () => action('build C++', 'build', { code: code.value });
+  $('run').onclick = () => action(`run slot ${slot()}`, 'run', { slot: slot() });
+  $('stop').onclick = () => action('stop', 'stop', {});
+  $('vm').onclick = () => confirm('Put the Python VM on the brain now? This takes a minute. Do not unplug it.') && action('install Python VM', 'python-vm', {});
+  checkBrain();
+})();
+</script>
+</body>
+</html>

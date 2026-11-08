@@ -1,0 +1,13 @@
+{
+  "name": "iq-raw",
+  "version": "0.1.0",
+  "description": "Blocks plus raw Python for the VEX IQ (2nd gen) brain, pushed over USB with VEX's own vexcom",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/blocks.test.mjs"
+  },
+  "dependencies": {
+    "blockly": "10.4.3"
+  }
+}
