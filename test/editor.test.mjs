@@ -11,24 +11,31 @@ w.SVGElement.prototype.getScreenCTM=()=>matrix;
 w.SVGElement.prototype.getCTM=()=>matrix;
 w.ResizeObserver=class{observe(){}disconnect(){}};
 w.matchMedia=()=>({matches:false,addEventListener(){}});
-w.EventSource=class{addEventListener(){}close(){}};
+w.EventSource=class{
+  static instances=[];
+  constructor(){this.listeners=new Map();w.EventSource.instances.push(this);}
+  addEventListener(name,fn){this.listeners.set(name,fn);}
+  emit(name,data){this.listeners.get(name)?.({data:JSON.stringify(data)});}
+  close(){}
+};
 w.fetch=async()=>({ok:true,json:async()=>({ok:false,out:'No mock brain'})});
 Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async()=>{}}});
 w.document.documentElement.requestFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:w.document.documentElement,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
 w.document.exitFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:null,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
-for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
+for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer','transfer-ui'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
 w.eval([...w.document.querySelectorAll('script')].find(s=>!s.src).textContent);
 const B=w.Blockly,ws=B.getMainWorkspace(),$=id=>w.document.getElementById(id);
 try{
   assert.equal(ws.getAllBlocks(false).length,1);
   assert.equal(ws.getTopBlocks()[0].type,'iq_when_started');
-  assert.equal(ws.getFlyout().autoClose,false);
+  assert.equal(ws.getFlyout().autoClose,true);
   assert.equal(ws.getRenderer().name,'zelos');
   const stored=JSON.parse(w.localStorage.getItem('iqraw.ws'));
   assert.equal(stored.blocks.blocks[0].type,'iq_when_started');
   const toolbox=ws.getToolbox();
   const category=toolbox.getToolboxItems().find(c=>c.getName()==='Brain');
   assert.ok(category.getDiv().querySelector('.blocklyTreeRow').style.getPropertyValue('--category-colour'));
+  const metricsBefore=ws.getMetricsManager().getAbsoluteMetrics();
   toolbox.setSelectedItem(category);
   const flyout=ws.getFlyout(),sample=flyout.getWorkspace().getTopBlocks(false)[0];
   const gesture=new B.Gesture(new w.MouseEvent('pointerdown'),ws);
@@ -39,14 +46,35 @@ try{
   const created=flyout.createBlock(sample);
   assert.ok(created&&created.workspace===ws);
   assert.ok(ws.getAllBlocks(false).length>1);
+  assert.equal(flyout.isVisible(),false,'Dragging a block should close the palette');
+  assert.equal(flyout.getClientRect(),null,'Closed palette cannot intercept drops');
+  assert.deepEqual(ws.getMetricsManager().getAbsoluteMetrics(),metricsBefore,'Palette width must not reserve canvas space after closing');
   gesture.dispose();
   await $('fullscreenToggle').onclick();
   assert.ok(w.document.body.classList.contains('focus-mode'));
   assert.equal($('sourcePanel').hidden,true);assert.equal($('consolePanel').hidden,true);
   $('consoleToggle').click();assert.equal($('consolePanel').hidden,false);assert.equal($('codeSidebar').hidden,false);
   $('controlsToggle').click();assert.equal(w.document.body.classList.contains('controls-collapsed'),false);
+  $('consoleToggle').click();assert.equal($('consolePanel').hidden,true);
+  w.document.dispatchEvent(new w.Event('iqraw-transfer-start'));
+  assert.equal($('consolePanel').hidden,false,'Starting a transfer must reveal its console progress');
+  assert.equal($('transferProgress').closest('#consolePanel'),$('consolePanel'));
   await w.document.exitFullscreen();
   assert.equal(w.document.body.classList.contains('focus-mode'),false);
   assert.equal($('sourcePanel').hidden,false);assert.equal($('consolePanel').hidden,false);
+  const stream=w.EventSource.instances[0];let finish;
+  w.fetch=()=>new Promise(resolve=>{finish=resolve;});
+  const running=$('run').onclick();
+  stream.emit('data','\x1b[2Jfirst startup print\n');
+  assert.ok(!$('log').textContent.includes('first startup print'),'Startup output must wait for the action result');
+  finish({ok:true,json:async()=>({ok:true,out:'Program started'})});await running;
+  const output=$('log').textContent;
+  assert.ok(output.indexOf('Done.')>=0&&output.indexOf('Done.')<output.indexOf('first startup print'),'Done must precede even an early print that clears the console');
+  stream.emit('data','later print\n');assert.ok($('log').textContent.indexOf('later print')>output.indexOf('first startup print'));
+  $('log').replaceChildren();
+  const failed=$('run').onclick();stream.emit('data','pending output\n');
+  finish({ok:true,json:async()=>({ok:false,out:'Run failed'})});await failed;
+  assert.ok(!$('log').textContent.includes('Done.'),'Failures must not claim completion');
+  assert.ok($('log').textContent.includes('pending output'),'Failed actions must also release queued text');
   console.log('ok - starter persistence, drag-only clicks, drag creation, dot categories, Zelos and fullscreen pane restoration');
 }finally{ws.dispose();dom.window.close();}

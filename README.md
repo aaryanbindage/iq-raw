@@ -41,7 +41,11 @@ To run it again later: `cd iq-raw && npm start`. To stop it: Ctrl+C in that Term
    - **Download and run** sends the program to the slot and starts it.
    - **Download** sends it without starting.
    - **Run slot** starts whatever is already in the slot. **Stop** stops the running program.
-6. Messages from the tools appear in the **Console** at the bottom right. Press **Connect brain** there to stream program output from the brain's USB user port, and use the input field for `ask` blocks. Clear, copy, ANSI text colours, and reconnect are supported. The console opens only when requested.
+6. Messages from the tools appear in the **Console** at the bottom right. **Run slot** and **Download and run** connect the console before starting the program, so startup prints are captured. You can also press **Connect brain** manually. Use the input field for `ask` blocks. Clear, copy, ANSI text colours, and reconnect are supported. C++ generated programs disable stdout buffering so same-row prints appear promptly; regenerate and download older programs to apply this change.
+
+Downloads show a live 40-character `█`/`░` progress bar **inside the console**, including in fullscreen; starting a build or transfer opens the console if collapsed. The same indicator covers C++ **1/2 · Building** (animated/indeterminate) and **2/2 · Downloading** (VEXcom's reported percentage). **Build only** also uses this indicator. A failed transfer keeps its last percentage and reports failure; only a successful result displays completion. Progress is streamed while the transfer runs, rather than replayed afterwards in the log.
+
+During a build/download/run, incoming program text and monitor updates are buffered in the initiating editor until the action result is logged. On success, **Done.** appears before buffered startup output is displayed. Failures report the error before releasing buffered text and do not print Done. Program-issued console clear commands clear program text while preserving tool/completion messages; the console's Clear button clears everything.
 
 New or empty workspaces start with **when started** already on the canvas. Toolbox blocks must be dragged onto it; clicking a toolbox block does not insert it. Categories use coloured dots, numeric/text reporters are rounded, and Boolean reporters are hexagonal.
 
@@ -97,7 +101,7 @@ Attach blocks underneath **when started**. Those blocks run once in order when t
 
 The hardware block families are checked against the [VEXcode IQ2 block reference](https://api.vex.com/iq2/home/blocks/index.html) and the installed IQ2 Python stubs/C++ headers. Vision requires sensor calibration: paste exported signature/colour values into setup blocks, and configure AI models in VEX's Vision Utility. Merely selecting a port does not calibrate a sensor. Hardware-specific sensing needs the corresponding connected device. Console monitors sample a global variable or sensor reporter every 250 ms and display up to 32 named readings; local function parameters/loop variables are unsupported. GPS is outside the IQ2 block reference. The original **Lists (Python)** category remains Python-only; the new named **Lists** and **2D lists** categories support both languages.
 
-The live console pauses and reconnects around downloads, program control and VM installation so it releases the USB port for `vexcom`. Failed transfers include port-owner diagnostics; version errors include the detected brain firmware and SDK target, rather than assuming firmware is outdated. Transfers that have started are not retried automatically.
+The live console uses the IQ2's separate USB user port; when connected, downloads and program control explicitly target the discovered admin port while the console keeps listening. VM installation pauses and reconnects the console because it can reset the USB connection. Failed transfers include port-owner diagnostics; version errors include the detected brain firmware and SDK target, rather than assuming firmware is outdated. Transfers that have started are not retried automatically. If the console cannot connect, running a program reports a visible warning that output may be missed.
 
 ## How it works
 

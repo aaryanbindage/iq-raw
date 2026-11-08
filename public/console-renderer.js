@@ -1,7 +1,7 @@
 (() => {
   // A small ANSI subset used by VEX console blocks. All output remains text nodes.
   function create(root,monitors) {
-    let pending='',wire='',colour='';
+    let pending='',wire='',colour='',held=0,queued='';
     const values=new Map();
     function monitor(line){
       const match=line.match(/^\x1eIQRAW_(MONITOR|HIDE)\t([^\t\r\n]*)(?:\t([^\r\n]*))?\r?$/);
@@ -32,7 +32,7 @@
           const match=pending.match(/^\x1b\[([0-9;]*)([A-Za-z])/);
           if(!match){if(pending.length<64&&/^\x1b(?:\[[0-9;]*)?$/.test(pending))break;pending=pending.slice(1);continue;}
           const [,args,cmd]=match;pending=pending.slice(match[0].length);
-          if(cmd==='J'&&args==='2')root.replaceChildren();
+          if(cmd==='J'&&args==='2')for(const row of root.querySelectorAll('.serial'))row.remove();
           if(cmd==='m'){
             const codes=(args||'0').split(';').map(Number);
             for(let i=0;i<codes.length;i++){
@@ -48,8 +48,11 @@
         root.scrollTop=root.scrollHeight;
     }
     return {
-      clear(){root.replaceChildren();pending='';wire='';colour='';values.clear();if(monitors){monitors.replaceChildren();monitors.hidden=true;}},
+      hold(){held++;},
+      release(){if(held&&!--held){const text=queued;queued='';this.append(text);}},
+      clear(){root.replaceChildren();pending='';wire='';queued='';colour='';values.clear();if(monitors){monitors.replaceChildren();monitors.hidden=true;}},
       append(chunk){
+        if(held){queued=(queued+chunk).slice(-200000);return;}
         wire+=chunk;
         while(wire){
           const start=wire.indexOf('\x1e');

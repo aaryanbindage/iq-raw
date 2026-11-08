@@ -64,14 +64,14 @@ const notFound = () => `vexcom was not found. Install the VS Code extension "VEX
 
 // ---- running tools, one command at a time (one USB device, and builds share the template) ----
 let queue = Promise.resolve();
-function run(bin, args, { timeoutMs = 30000, cwd, env } = {}) {
+function run(bin, args, { timeoutMs = 30000, cwd, env, onOutput } = {}) {
   const job = queue.then(() => new Promise((resolve) => {
     if (!bin) return resolve({ code: -1, out: notFound() });
     const p = spawn(bin, args, { cwd: cwd || path.dirname(bin), env: env || process.env });
     let out = '';
     const timer = setTimeout(() => { out += '\n[timed out]'; p.kill(); }, timeoutMs);
-    p.stdout.on('data', (d) => (out += d));
-    p.stderr.on('data', (d) => (out += d));
+    p.stdout.on('data', (d) => {out += d;onOutput?.(d,'stdout');});
+    p.stderr.on('data', (d) => {out += d;onOutput?.(d,'stderr');});
     p.on('error', (e) => { clearTimeout(timer); resolve({ code: -1, out: String(e) }); });
     p.on('close', (code, signal) => {
       clearTimeout(timer);
@@ -92,8 +92,11 @@ const VEX_ERRORS = {
   7: 'invalid command parameter',
   8: 'VEXos error',
 };
-const vexcom = async (args, timeoutMs = 30000) => {
-  const r = await run(findVexcom(), args, { timeoutMs });
+const vexcom = async (args, timeoutMs = 30000, onProgress) => {
+  const parser=require('./transfer-progress').progressParser;
+  const streams=onProgress?{stdout:parser(onProgress),stderr:parser(onProgress)}:null;
+  const r = await run(findVexcom(), args, { timeoutMs,onOutput:streams?(data,stream)=>streams[stream].write(data):undefined });
+  if(streams){streams.stdout.end();streams.stderr.end();}
   if (r.code !== 0) {
     const detail = r.signal ? `terminated by ${r.signal}` : `exited with code ${r.code} (${VEX_ERRORS[r.code] || 'tool could not complete the command'})`;
     r.out = `${r.out.trim()}\n\nvexcom ${detail}.`.trim();
@@ -168,10 +171,16 @@ async function buildCpp(code) {
 const cleanSlot = (s) => (Number.isInteger(s) && s >= 1 && s <= 8 ? s : null);
 const cleanName = (n) => (typeof n === 'string' && /^[\w .-]{1,32}$/.test(n.trim()) ? n.trim() : 'iq-raw');
 
-async function download({ code, slot, name, run: runAfter, lang = 'python', timeoutMs = 120000 }) {
+async function prepareConsole(){
+  try{await brainConsole.connect();return '';}
+  catch(error){return '\nConsole connection failed: '+error.message+'\nProgram output may be missed until the console is connected.';}
+}
+
+async function download({ code, slot, name, run: runAfter, lang = 'python', timeoutMs = 120000, onProgress=()=>{} }) {
   let dir = null;
   try {
     let file;
+    onProgress({phase:lang==='cpp'?'build':'prepare',percent:null});
     if (lang === 'cpp') {
       const b = await buildCpp(code);
       dir = b.dir || null;
@@ -185,16 +194,27 @@ async function download({ code, slot, name, run: runAfter, lang = 'python', time
     // Match VEX's extension, including structured error output. Be verbose on
     // the first attempt rather than repeating a possibly partially completed transfer.
     const base = ['--slot', String(slot), '--write', file, '--json', '--progress', '--verbose'];
-    if (runAfter) base.push('--run');
-    const r = await brainConsole.withSuspended(async()=>{
-      let result=await vexcom(['--name', name, ...base], timeoutMs);
+    let warning='';
+    if (runAfter){
+      onProgress({phase:'console',percent:null});
+      warning=await prepareConsole();
+      base.push('--run');
+    }
+    // IQ2 USB has separate admin and user ports. Keep the terminal listening before
+    // startup, and explicitly direct VEXcom commands to the discovered admin port.
+    const admin=brainConsole.adminPort();if(admin)base.push(admin);
+    onProgress({phase:'download',percent:null});
+    const r = await (async()=>{
+      let result=await vexcom(['--name', name, ...base], timeoutMs,onProgress);
       // Retry only an explicitly unsupported option, never an interrupted transfer.
       const transferStarted=/"(?:phase|action)"\s*:\s*"(?:program|download)"/.test(result.out);
-      if(result.code!==0&&!transferStarted&&/unknown|unrecognized|invalid option|usage/i.test(result.out))result=await vexcom(base,timeoutMs);
+      if(result.code!==0&&!transferStarted&&/unknown|unrecognized|invalid option|usage/i.test(result.out))result=await vexcom(base,timeoutMs,onProgress);
       if(result.code===3)result.out+='\n'+await versionDiagnostics(lang);
       if(result.code!==0&&[2,3,4,5,6].includes(result.code))result.out+='\n'+await portDiagnostics();
       return result;
-    });
+    })();
+    r.out+=warning;
+    r.warning=warning;
     if (r.code === 1 && lang !== 'cpp') r.out += '\n\nFor Python, also check that the Python VM has been installed on this brain using "Install Python VM".';
     return r;
   } finally {
@@ -220,6 +240,15 @@ function sendFile(res, file) {
     res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
     res.end(data);
   });
+}
+
+async function streamOperation(res,action){
+  res.writeHead(200,{'content-type':'application/x-ndjson','cache-control':'no-store','x-content-type-options':'nosniff'});
+  res.flushHeaders();
+  const emit=event=>{if(!res.destroyed&&!res.writableEnded)res.write(JSON.stringify(event)+'\n');};
+  try{emit({type:'result',...await action(progress=>emit({type:'progress',...progress}))});}
+  catch(error){emit({type:'result',ok:false,out:String(error.message||error)});}
+  res.end();
 }
 
 function inside(base, p) {
@@ -271,14 +300,22 @@ const server = http.createServer(async (req, res) => {
         const slot = cleanSlot(body.slot);
         if (!slot) return json(400, { error: 'Slot must be 1 to 8.' });
         if (typeof body.code !== 'string' || !body.code.trim() || body.code.length > MAX_CODE) return json(400, { error: 'No code to send (or too long).' });
-        const r = await download({ code: body.code.replace(/\r\n/g, '\n'), slot, name: cleanName(body.name), run: body.run === true, lang: body.lang === 'cpp' ? 'cpp' : 'python' });
-        return json(200, { ok: r.code === 0, out: r.out });
+        const options={ code: body.code.replace(/\r\n/g, '\n'), slot, name: cleanName(body.name), run: body.run === true, lang: body.lang === 'cpp' ? 'cpp' : 'python' };
+        if(body.stream===true){
+          return streamOperation(res,async onProgress=>{const r=await download({...options,onProgress});return {ok:r.code===0,out:r.out,warning:r.warning};});
+        }
+        const r = await download(options);
+        return json(200, { ok: r.code === 0, out: r.out, warning:r.warning });
       }
       if (url.pathname === '/api/build') {
         if (typeof body.code !== 'string' || !body.code.trim() || body.code.length > MAX_CODE) return json(400, { error: 'No code to build (or too long).' });
-        const b = await buildCpp(body.code.replace(/\r\n/g, '\n'));
-        if (b.dir) fs.rmSync(b.dir, { recursive: true, force: true });
-        return json(200, { ok: b.ok, out: b.ok ? (b.out.trim() + '\nBuild OK.') : b.out });
+        const build=async()=>{
+          const b=await buildCpp(body.code.replace(/\r\n/g,'\n'));
+          if(b.dir)fs.rmSync(b.dir,{recursive:true,force:true});
+          return {ok:b.ok,out:b.ok?(b.out.trim()+'\nBuild OK.'):b.out};
+        };
+        if(body.stream===true)return streamOperation(res,onProgress=>{onProgress({phase:'build',percent:null});return build();});
+        return json(200,await build());
       }
       if (url.pathname === '/api/probe') {
         const slot = cleanSlot(body.slot) || 8;
@@ -292,9 +329,11 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/run' || url.pathname === '/api/stop' || url.pathname === '/api/erase') {
         const slot = cleanSlot(body.slot);
         if (url.pathname !== '/api/stop' && !slot) return json(400, { error: 'Slot must be 1 to 8.' });
-        const args = url.pathname === '/api/stop' ? ['--stop'] : url.pathname === '/api/run' ? ['--slot', String(slot), '--load'] : ['--erase', String(slot)];
-        const r = await brainConsole.withSuspended(()=>vexcom(args, 30000));
-        return json(200, { ok: r.code === 0, out: r.out });
+        const warning=url.pathname==='/api/run'?await prepareConsole():'';
+        const args = url.pathname === '/api/stop' ? ['--stop'] : url.pathname === '/api/run' ? ['--slot', String(slot), '--run'] : ['--erase', String(slot)];
+        const admin=brainConsole.adminPort();if(admin)args.push(admin);
+        const r = await vexcom(args, 30000);r.out+=warning;
+        return json(200, { ok: r.code === 0, out: r.out, warning });
       }
       return json(404, { error: 'No such call.' });
     } catch (e) {

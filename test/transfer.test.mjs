@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),{JSDOM}=require('jsdom');
+const {progressParser}=require('../transfer-progress');
+const seen=[],parser=progressParser(value=>seen.push(value));
+parser.write('banner\n{"phase":"program","action":"down');
+parser.write('load","percent":7}\r\n{"phase":"program","action":"download","percent":"90"}\n');
+parser.write('{"phase":"program","action":"download","percent":110}');parser.end();
+assert.deepEqual(seen,[{phase:'download',percent:7},{phase:'download',percent:100}]);
+
+const dom=new JSDOM('<section id="transferProgress" hidden><span id="transferLabel"></span><span id="transferPercent"></span><button id="transferDismiss"></button><pre id="transferBar"></pre></section>',{runScripts:'outside-only'});
+const w=dom.window,$=id=>w.document.getElementById(id);w.TextDecoder=TextDecoder;
+w.eval(fs.readFileSync('public/transfer-ui.js','utf8'));
+const tick=()=>new Promise(resolve=>setImmediate(resolve)),encoder=new TextEncoder();
+let pipe;
+w.fetch=async()=>new Response(new ReadableStream({start(controller){pipe=controller;}}));
+const feed=data=>pipe.enqueue(encoder.encode(data));
+try{
+  const success=w.IQTransfer.download({slot:8,run:true,lang:'cpp'});await tick();
+  assert.equal($('transferProgress').hidden,false);
+  assert.equal($('transferBar').hasAttribute('aria-valuenow'),false,'Preparing must not invent a percentage');
+  feed('{"type":"progress","phase":"build","percent":null}\n');await tick();
+  assert.match($('transferLabel').textContent,/1\/2.*Building C\+\+/);
+  assert.ok($('transferBar').classList.contains('indeterminate'));
+  feed('{"type":"progress","phase":"download","percent":');feed('7}\n');await tick();
+  assert.equal($('transferPercent').textContent,'7%');
+  assert.equal(($('transferBar').textContent.match(/█/g)||[]).length,2);
+  assert.equal(($('transferBar').textContent.match(/░/g)||[]).length,38);
+  assert.equal($('transferDismiss').disabled,true);
+  feed('{"type":"result","ok":true,"out":"done"}\n');pipe.close();
+  assert.equal((await success).ok,true);assert.equal($('transferPercent').textContent,'100%');
+  assert.equal($('transferLabel').textContent,'Download and run complete');
+  $('transferDismiss').click();assert.equal($('transferProgress').hidden,true);
+
+  const failure=w.IQTransfer.download({slot:8});await tick();
+  feed('{"type":"progress","phase":"download","percent":7}\n{"type":"result","ok":false,"out":"code 4"}\n');pipe.close();
+  assert.equal((await failure).ok,false);assert.equal($('transferPercent').textContent,'7%');
+  assert.ok($('transferProgress').classList.contains('failed'));
+  const warning=w.IQTransfer.download({slot:8,run:true});await tick();
+  feed('{"type":"result","ok":true,"out":"done","warning":"Console connection failed"}\n');pipe.close();
+  await warning;assert.match($('transferLabel').textContent,/console unavailable/);
+  const build=w.IQTransfer.build({code:'test'});await tick();
+  assert.match($('transferLabel').textContent,/Building C\+\+/);
+  feed('{"type":"result","ok":true,"out":"Build OK"}\n');pipe.close();await build;
+  assert.equal($('transferLabel').textContent,'Build complete');
+  const interrupted=w.IQTransfer.download({slot:8});await tick();pipe.close();
+  await assert.rejects(interrupted,/before the download result/);
+  assert.notEqual($('transferPercent').textContent,'100%');
+  assert.equal(w.IQTransfer.withoutProgress('{"phase":"program","action":"download","percent":7}\nreal error'),'real error');
+  console.log('ok - chunked progress JSON, live Unicode bar, indeterminate preparation, completion, failures and interrupted streams');
+}finally{dom.window.close();}

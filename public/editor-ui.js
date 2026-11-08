@@ -9,6 +9,15 @@
   Blockly.registry.register(Blockly.registry.Type.TOOLBOX_ITEM, Blockly.ToolboxCategory.registrationName, DotCategory, true);
   Blockly.registry.register(Blockly.registry.Type.TOOLBOX_ITEM, Blockly.CollapsibleToolboxCategory.registrationName, DotGroup, true);
 
+  // Blockly 10's autoClose=false means a permanently docked flyout: its metrics
+  // reserve palette width even after hiding it. Suppress only the click-to-copy
+  // gesture instead, preserving normal overlay layout, drag creation and closing.
+  const blockClick=Blockly.Gesture.prototype.doBlockClick;
+  Blockly.Gesture.prototype.doBlockClick=function(...args){
+    if(this.flyout?.iqrawDragOnly)return;
+    return blockClick.apply(this,args);
+  };
+
   const icons = {
     send:'M4 12h15m-6-6 6 6-6 6M4 5v14', download:'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
     play:'m8 4 12 8-12 8Z', stop:'M5 5h14v14H5Z', build:'m14 4 6 6-10 10-6-6ZM4 4l4 4',
@@ -34,8 +43,8 @@
     if(!ws.getAllBlocks(false).length) {
       const start=ws.newBlock('iq_when_started');start.initSvg();start.render();start.moveBy(48,40);
     }
-    // With autoClose=false Blockly ignores a flyout click and only creates on drag.
-    ws.getFlyout().setAutoClose(false);
+    ws.getFlyout().iqrawDragOnly=true;
+    ws.getFlyout().setAutoClose(true);
   }
   function setup(ws,{api,log}) {
     const $=id=>document.getElementById(id);
@@ -56,6 +65,7 @@
       Blockly.svgResize(ws);
     };
     for(const key of ['code','console','controls']) $(key+'Toggle').onclick=()=>{state[key]=!state[key];paint();};
+    document.addEventListener('iqraw-transfer-start',()=>{state.console=true;paint();});
     let focused=false,previous;
     const focus=(on)=>{
       if(on===focused)return;
@@ -71,6 +81,8 @@
     document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)focus(false);});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&focused&&!document.fullscreenElement)focus(false);});
     const terminal=IQConsole.create($('log'),$('liveMonitors'));
+    document.addEventListener('iqraw-command-start',()=>terminal.hold());
+    document.addEventListener('iqraw-command-end',()=>terminal.release());
     $('consoleClear').onclick=async()=>{terminal.clear();try{await api('console/clear',{});}catch(e){log(e.message,'err');}};
     $('consoleCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('log').textContent);}catch{log('Copy failed. Select and copy the console text manually.','err');}};
     let connected=false;

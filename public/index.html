@@ -62,6 +62,10 @@
     </section>
     <section id="consolePanel" aria-labelledby="consoleHeading">
       <div class="panel-heading console-heading"><h2 id="consoleHeading">Console</h2><span id="consoleStatus">Tool output · brain disconnected</span><div class="console-actions"><button id="consoleConnect" type="button">Connect brain</button><button id="consoleClear" type="button">Clear</button><button id="consoleCopy" type="button">Copy</button></div></div>
+      <section id="transferProgress" class="transfer-progress" aria-label="Build and download progress" hidden>
+        <div class="transfer-heading"><span id="transferLabel" role="status">Preparing download…</span><span id="transferPercent"></span><button id="transferDismiss" type="button" aria-label="Dismiss transfer progress">×</button></div>
+        <pre id="transferBar" role="progressbar" aria-label="Build and download progress" aria-valuemin="0" aria-valuemax="100"></pre>
+      </section>
       <dl id="liveMonitors" aria-label="Live value monitors" hidden></dl>
       <pre id="log" aria-label="Console output" tabindex="0"></pre>
       <form id="consoleForm"><label class="sr-only" for="consoleInput">Send a line to the brain</label><input id="consoleInput" type="text" placeholder="Send a line to the brain…" autocomplete="off" disabled><button id="consoleSend" type="submit" disabled>Send</button></form>
@@ -79,6 +83,7 @@
 <script src="/iq-vex.js"></script>
 <script src="/editor-ui.js"></script>
 <script src="/console-renderer.js"></script>
+<script src="/transfer-ui.js"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -104,12 +109,19 @@
   const busy = (on) => ['send','sendOnly','run','stop','build','vm','refresh'].forEach(id => ($(id).disabled = on));
   async function action(label, path, body) {
     busy(true); log('> ' + label);
+    const holdOutput=['download','run','build','probe'].includes(path);
+    if(holdOutput)document.dispatchEvent(new Event('iqraw-command-start'));
     try {
-      const j = await api(path, body);
-      log(j.out.trim() || '(no output)', j.ok ? 'okk' : 'err');
-      if (!j.ok) log(label + ' failed.', 'err');
+      const j = path==='download'?await IQTransfer.download(body):path==='build'?await IQTransfer.build(body):await api(path, body);
+      const output=path==='download'?IQTransfer.withoutProgress(j.out):j.out;
+      const text=(j.warning?output.replace(j.warning,''):output).trim();
+      if(text)log(text,j.ok?'okk':'err');
+      else if(!j.ok)log('(no output)','err');
+      if(j.warning)log(j.warning.trim(),'err');
+      if(j.ok)log('Done.','okk');else log(label + ' failed.', 'err');
       return j;
-    } catch (e) { log(String(e.message || e), 'err'); } finally { busy(false); }
+    } catch (e) { log(String(e.message || e), 'err'); }
+    finally{if(holdOutput)document.dispatchEvent(new Event('iqraw-command-end'));busy(false);}
   }
 
   // ---- slots ----
