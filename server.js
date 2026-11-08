@@ -131,11 +131,18 @@ async function download({ code, slot, name, run: runAfter, lang = 'python', time
       file = path.join(dir, 'main.py');
       fs.writeFileSync(file, code);
     }
-    const base = ['--slot', String(slot), '--write', file, '--timer', '--progress'];
+    // same flags VEX's own extension uses: --name, --slot, --write, optional --run, --progress
+    const base = ['--slot', String(slot), '--write', file, '--progress'];
     if (runAfter) base.push('--run');
     let r = await vexcom(['--name', name, ...base], timeoutMs);
     // older vexcom builds do not know --name
     if (r.code !== 0 && /unknown|unrecognized|invalid option|usage/i.test(r.out)) r = await vexcom(base, timeoutMs);
+    if (r.code !== 0 && r.code !== -1 && !/\[timed out\]/.test(r.out)) {
+      // vexcom's own failure message is often empty, so try once more in verbose mode to show what it was doing
+      const v = await vexcom(['-v', '--name', name, ...base], timeoutMs);
+      r = { code: v.code, out: `${r.out.trim()}\n\n--- retried in verbose mode ---\n${v.out.trim()}` };
+      if (v.code !== 0 && lang !== 'cpp') r.out += '\n\nIf this is the first Python program on this brain, press "Install Python VM" and try again.';
+    }
     return r;
   } finally {
     if (dir) fs.rmSync(dir, { recursive: true, force: true });
