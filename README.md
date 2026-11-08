@@ -27,7 +27,7 @@ To run it again later: `cd iq-raw && npm start`. To stop it: Ctrl+C in that Term
 
 ## How to use it
 
-1. **Plug the brain in** with a USB-C cable and turn it on. Press **Check brain** (top right). It says "connected" when it finds the brain.
+1. **Plug the brain in** with a USB-C cable and turn it on. If macOS shows an **"Allow accessory to connect?"** prompt, click **Allow**. Until you do, the Mac lists the brain but blocks it, and iq-raw (and VS Code's VEX extension) report "Device not specified or not found" or "no device connected". Press **Check brain** (top right). It says "connected" when it finds the brain.
 2. **Pick a language** in the top bar: Python or C++.
 3. **Pick a slot** (1 to 8) and a name. This is where the program is stored on the brain and the name it shows.
 4. **Make the program**, either way:
