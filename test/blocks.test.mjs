@@ -90,7 +90,7 @@ const { server } = require('../server.js');
 await new Promise((r) => server.listen(5199, '127.0.0.1', r));
 const get = (p, h = {}) => fetch('http://127.0.0.1:5199' + p, { headers: h });
 assert.equal((await get('/')).status, 200);
-for (const asset of ['/settings.html', '/base.css', '/app.css', '/theme.js', '/preferences.js', '/settings.js', '/transfer-ui.js']) {
+for (const asset of ['/settings.html', '/base.css', '/app.css', '/theme.js', '/preferences.js', '/settings.js', '/transfer-ui.js', '/simulator-core.js', '/simulator-worker.js', '/simulator-screen.js', '/simulator-ui.js', '/assets/iq2-brain-simulator.png']) {
   assert.equal((await get(asset)).status, 200, asset + ' should be served');
 }
 assert.equal((await get('/vendor/blockly/blockly_compressed.js')).status, 200);

@@ -22,7 +22,7 @@ w.fetch=async()=>({ok:true,json:async()=>({ok:false,out:'No mock brain'})});
 Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async()=>{}}});
 w.document.documentElement.requestFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:w.document.documentElement,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
 w.document.exitFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:null,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
-for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer','transfer-ui'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
+for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer','transfer-ui','simulator-screen','simulator-ui'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
 w.eval([...w.document.querySelectorAll('script')].find(s=>!s.src).textContent);
 const B=w.Blockly,ws=B.getMainWorkspace(),$=id=>w.document.getElementById(id);
 try{
@@ -75,5 +75,20 @@ try{
   finish({ok:true,json:async()=>({ok:false,out:'Run failed'})});await failed;
   assert.ok(!$('log').textContent.includes('Done.'),'Failures must not claim completion');
   assert.ok($('log').textContent.includes('pending output'),'Failed actions must also release queued text');
+  const preview=$('brainPreview');
+  preview.showModal=()=>preview.setAttribute('open','');
+  preview.close=()=>{preview.removeAttribute('open');preview.dispatchEvent(new w.Event('close'));};
+  $('simScreen').getContext=()=>({fillRect(){}});
+  w.Worker=class{static instances=[];constructor(url){this.url=url;this.messages=[];this.terminated=false;w.Worker.instances.push(this);}postMessage(data){this.messages.push(data);}terminate(){this.terminated=true;}};
+  const original=JSON.stringify(B.serialization.workspaces.save(ws));
+  $('previewToggle').click();assert.equal(preview.open,true);
+  $('simDemo').click();const simulated=w.Worker.instances.at(-1);
+  assert.equal(simulated.url,'/simulator-worker.js');
+  assert.equal(simulated.messages[0].type,'run');
+  assert.equal(JSON.stringify(B.serialization.workspaces.save(ws)),original,'Drawing demo must leave the real workspace unchanged');
+  $('simRight').onkeydown(new w.KeyboardEvent('keydown',{key:' '}));
+  $('simRight').onkeyup(new w.KeyboardEvent('keyup',{key:' '}));
+  assert.equal(simulated.messages.at(-2).name,'right');assert.equal(simulated.messages.at(-2).down,true);assert.equal(simulated.messages.at(-1).down,false);
+  $('simClose').click();assert.equal(simulated.terminated,true,'Closing preview must terminate its worker');assert.equal(preview.open,false);
   console.log('ok - starter persistence, drag-only clicks, drag creation, dot categories, Zelos and fullscreen pane restoration');
 }finally{ws.dispose();dom.window.close();}

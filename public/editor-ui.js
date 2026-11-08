@@ -52,7 +52,7 @@
       ['send','send','Download and run'],['sendOnly','download','Download'],['run','play','Run slot'],['stop','stop','Stop'],['build','build','Build only'],['vm','chip','Install Python VM'],
       ['refresh','refresh','Check brain'],['open','open','Open code'],['save','save','Save code'],['programs','list','Programs on brain'],['probe','chip','Probe brain API'],['settingsLink','settings','Settings'],
     ]) iconize($(id),name,label);
-    for(const [id,name,label] of [['fullscreenToggle','fullscreen','Fullscreen focus mode'],['controlsToggle','controls','Program controls'],['codeToggle','code','Show or hide code'],['consoleToggle','console','Show or hide console'],['consoleClear','clear','Clear console'],['consoleCopy','copy','Copy console']]) iconize($(id),name,label,true);
+    for(const [id,name,label] of [['fullscreenToggle','fullscreen','Fullscreen focus mode'],['controlsToggle','controls','Program controls'],['codeToggle','code','Show or hide code'],['consoleToggle','console','Show or hide console'],['previewToggle','chip','Brain preview'],['consoleClear','clear','Clear console'],['consoleCopy','copy','Copy console']]) iconize($(id),name,label,true);
     const source=$('sourcePanel'),consolePanel=$('consolePanel');
     const state={code:true,console:true,controls:true};
     const paint=()=>{

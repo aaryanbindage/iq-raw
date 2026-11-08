@@ -51,6 +51,12 @@ New or empty workspaces start with **when started** already on the canvas. Toolb
 
 The header's icon buttons independently collapse program controls, source code, and console. **Fullscreen focus mode** collapses all three and turns the main actions into icon buttons with tooltips. Reopen the panels you need using the header buttons; Escape or the fullscreen button restores the previous layout.
 
+**Brain preview:** use the chip-shaped **Brain preview** button in the header, then **Run blocks**. The offline simulator executes a snapshot of your blocks in a browser worker and draws a 160 × 108 screen over a realistic IQ2 brain illustration with left/right arrows, Check and X. **Enlarge screen** makes graphs easier to inspect; **Save screen** exports a PNG. **Try drawing demo** runs a sample without changing your workspace. Check triggers brain-button events, and X/Stop/closing the preview terminates simulation. No brain, USB connection, Python installation or C++ build is needed.
+
+The preview supports screen text/drawing, axes and graphs, real/complex math and numerical calculus, numeric/Boolean/complex variables, named lists, loops, conditional control, statement procedures, waits, timers and console print. It uses approximate browser fonts/timing and does not model robot motion, physical sensors, sounds, raw Python/C++, or all VEX APIs. Unsupported blocks stop with their name and an explanation. Hand-edited source is not executed. The existing USB download/run controls continue to target the real brain independently. Generated image details and prompts are in [asset notes](public/assets/README.md).
+
+**Bluetooth:** the installed VEXcom V1.0.2b2 exposes USB serial transports and no Bluetooth connection mode. IQ2 Bluetooth pairing exists in [VEXcode IQ](https://api.vex.com/iq2/home/vexcode_tutorials/connecting-to-your-robot.html), but adding that to iq-raw would require a separate BLE transport/protocol; a VEXcom Bluetooth option is not available.
+
 **Python mode, first time on a brain:** press **Install Python VM** once. It puts VEX's Python interpreter on the brain. Redo it after a VEXos update.
 
 **C++ mode:** press **Build only** to compile and see errors without touching the brain. Download compiles first, then sends.
