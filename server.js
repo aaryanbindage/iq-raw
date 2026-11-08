@@ -85,7 +85,7 @@ function run(bin, args, { timeoutMs = 30000, cwd, env } = {}) {
 const VEX_ERRORS = {
   1: 'operation failed; no specific cause reported',
   2: 'brain communication failed; disconnect the brain in VEXcode IQ or quit VEXcode, then reconnect USB',
-  3: 'version error',
+  3: 'version error; vexcom did not identify which component is incompatible',
   4: 'command error',
   5: 'device not found; connect the powered-on brain directly by USB',
   6: 'serial port error; close other VEX apps and check the USB connection',
@@ -100,6 +100,32 @@ const vexcom = async (args, timeoutMs = 30000) => {
   }
   return r;
 };
+const brainConsole = require('./serial-console').createConsole({ SerialPort: require('serialport').SerialPort, query: () => vexcom(['--json'],20000) });
+
+async function portDiagnostics(){
+  if(process.platform!=='darwin')return '';
+  const ports=fs.readdirSync('/dev').filter(name=>/^(?:tty|cu)\.usbmodem[\w.-]+$/.test(name)).slice(0,64).map(name=>'/dev/'+name);
+  if(!ports.length)return '\nNo USB modem ports are present. Reconnect the powered-on brain using a USB data cable.';
+  const result=await run('/usr/sbin/lsof',['-nP',...ports],{timeoutMs:5000});
+  const owners=[...new Set(result.out.split('\n').slice(1).map(line=>line.trim().split(/\s+/)).filter(parts=>parts.length>2&&Number(parts[1])!==process.pid).map(parts=>parts[0]))];
+  return owners.length?'\nUSB ports are also open in: '+owners.join(', ')+'. Disconnect the brain in those apps, then retry the download.': '\nCheck the USB cable and brain screen, then reconnect USB before retrying. The transfer was not retried automatically.';
+}
+
+async function versionDiagnostics(lang){
+  const status=await vexcom(['--json','--verbose'],20000);
+  let info;
+  try{info=JSON.parse(status.out.slice(status.out.indexOf('{')));}catch{return '\nCould not read versions after the failure. Disconnect the brain in other VEX apps, reconnect USB, and check again.';}
+  const version=hex=>{const n=parseInt(hex,16);return Number.isFinite(n)?[n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join('.'): 'unknown';};
+  let message='\nBrain VEXos: '+version(info.iq2?.brain?.vexos)+'.';
+  if(lang==='cpp'){
+    try{
+      const sdk=findCpp(),manifest=JSON.parse(fs.readFileSync(path.join(sdk.sdk,'manifest.json'),'utf8'));
+      const target=manifest.platforms.find(p=>p.name==='vexiq2')?.vexos;
+      if(target)message+=' C++ SDK target VEXos: '+target+'.';
+    }catch{/* SDK details are optional diagnostics */}
+  }else message+=' Python VM is '+(info.iq2?.vms?.items?.some(item=>item.binfile==='python_vm.bin')?'installed':'not reported as installed')+'.';
+  return message+'\nA version error alone does not establish that brain firmware is outdated. Use the VEX extension to check the matching tools/runtime before updating firmware.';
+}
 
 // ---- the C++ toolchain: VEX's SDK, clang and make, downloaded by the VEX VS Code extension ----
 const STORAGE = process.env.VEX_STORAGE || path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'vexrobotics.vexcode');
@@ -160,9 +186,15 @@ async function download({ code, slot, name, run: runAfter, lang = 'python', time
     // the first attempt rather than repeating a possibly partially completed transfer.
     const base = ['--slot', String(slot), '--write', file, '--json', '--progress', '--verbose'];
     if (runAfter) base.push('--run');
-    let r = await vexcom(['--name', name, ...base], timeoutMs);
-    // older vexcom builds do not know --name
-    if (r.code !== 0 && /unknown|unrecognized|invalid option|usage/i.test(r.out)) r = await vexcom(base, timeoutMs);
+    const r = await brainConsole.withSuspended(async()=>{
+      let result=await vexcom(['--name', name, ...base], timeoutMs);
+      // Retry only an explicitly unsupported option, never an interrupted transfer.
+      const transferStarted=/"(?:phase|action)"\s*:\s*"(?:program|download)"/.test(result.out);
+      if(result.code!==0&&!transferStarted&&/unknown|unrecognized|invalid option|usage/i.test(result.out))result=await vexcom(base,timeoutMs);
+      if(result.code===3)result.out+='\n'+await versionDiagnostics(lang);
+      if(result.code!==0&&[2,3,4,5,6].includes(result.code))result.out+='\n'+await portDiagnostics();
+      return result;
+    });
     if (r.code === 1 && lang !== 'cpp') r.out += '\n\nFor Python, also check that the Python VM has been installed on this brain using "Install Python VM".';
     return r;
   } finally {
@@ -215,6 +247,10 @@ const server = http.createServer(async (req, res) => {
       if (req.headers.origin && req.headers.origin !== `http://${host}`) return json(403, { error: 'Bad origin' });
     }
     try {
+      if (url.pathname === '/api/console/events' && req.method === 'GET') {
+        if(req.headers.origin && req.headers.origin!==`http://${host}`) return void res.writeHead(403).end('Bad origin');
+        return brainConsole.subscribe(req,res);
+      }
       if (url.pathname === '/api/info' && req.method === 'GET') {
         const r = await vexcom(['--json'], 20000);
         let info = null;
@@ -227,6 +263,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method !== 'POST') return json(405, { error: 'POST only' });
       const body = await readJson(req);
+      if(url.pathname==='/api/console/connect') return json(200,{ok:true,...await brainConsole.connect()});
+      if(url.pathname==='/api/console/disconnect') return json(200,{ok:true,...await brainConsole.disconnect()});
+      if(url.pathname==='/api/console/input'){await brainConsole.input(body.text);return json(200,{ok:true});}
+      if(url.pathname==='/api/console/clear'){brainConsole.clear();return json(200,{ok:true});}
       if (url.pathname === '/api/download') {
         const slot = cleanSlot(body.slot);
         if (!slot) return json(400, { error: 'Slot must be 1 to 8.' });
@@ -246,14 +286,14 @@ const server = http.createServer(async (req, res) => {
         return json(200, { ok: /PROBE /.test(r.out), out: r.out });
       }
       if (url.pathname === '/api/python-vm') {
-        const r = await vexcom(['--python', '--timer', '--progress'], 180000);
+        const r = await brainConsole.withSuspended(()=>vexcom(['--python', '--timer', '--progress'], 180000));
         return json(200, { ok: r.code === 0, out: r.out });
       }
       if (url.pathname === '/api/run' || url.pathname === '/api/stop' || url.pathname === '/api/erase') {
         const slot = cleanSlot(body.slot);
         if (url.pathname !== '/api/stop' && !slot) return json(400, { error: 'Slot must be 1 to 8.' });
         const args = url.pathname === '/api/stop' ? ['--stop'] : url.pathname === '/api/run' ? ['--slot', String(slot), '--load'] : ['--erase', String(slot)];
-        const r = await vexcom(args, 30000);
+        const r = await brainConsole.withSuspended(()=>vexcom(args, 30000));
         return json(200, { ok: r.code === 0, out: r.out });
       }
       return json(404, { error: 'No such call.' });
@@ -274,3 +314,4 @@ if (require.main === module) {
   server.listen(PORT, '127.0.0.1', () => console.log(`iq-raw: open http://localhost:${PORT}  (vexcom: ${findVexcom() || 'NOT FOUND'})`));
 }
 module.exports = { server, vexcom, findVexcom };
+server.on('close',()=>brainConsole.close().catch(()=>{}));

@@ -5,9 +5,10 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node test/blocks.test.mjs && node test/catalog.test.mjs && node test/math.test.mjs"
+    "test": "node test/blocks.test.mjs && node test/catalog.test.mjs && node test/math.test.mjs && node test/vex.test.mjs && node test/editor.test.mjs && node test/console.test.mjs"
   },
   "dependencies": {
-    "blockly": "10.4.3"
+    "blockly": "10.4.3",
+    "serialport": "^13.0.0"
   }
 }

@@ -41,7 +41,11 @@ To run it again later: `cd iq-raw && npm start`. To stop it: Ctrl+C in that Term
    - **Download and run** sends the program to the slot and starts it.
    - **Download** sends it without starting.
    - **Run slot** starts whatever is already in the slot. **Stop** stops the running program.
-6. Messages from the tools appear in the box at the bottom right. Compiler errors and brain messages show up there.
+6. Messages from the tools appear in the **Console** at the bottom right. Press **Connect brain** there to stream program output from the brain's USB user port, and use the input field for `ask` blocks. Clear, copy, ANSI text colours, and reconnect are supported. The console opens only when requested.
+
+New or empty workspaces start with **when started** already on the canvas. Toolbox blocks must be dragged onto it; clicking a toolbox block does not insert it. Categories use coloured dots, numeric/text reporters are rounded, and Boolean reporters are hexagonal.
+
+The header's icon buttons independently collapse program controls, source code, and console. **Fullscreen focus mode** collapses all three and turns the main actions into icon buttons with tooltips. Reopen the panels you need using the header buttons; Escape or the fullscreen button restores the previous layout.
 
 **Python mode, first time on a brain:** press **Install Python VM** once. It puts VEX's Python interpreter on the brain. Redo it after a VEXos update.
 
@@ -63,7 +67,7 @@ Other buttons: **Open .py** and **Save .py** load and save the code box as a fil
 
 **Brain drawing:** pixels, lines, rectangles, circles, outline ellipses, arcs and triangles, pen/fill colors (including custom RGB), pen width, fonts, positioned text, drawing origin, clipping, clear and render. Screen coordinates start at the top left: x = 0–159, y = 0–107. Positive arc angles run clockwise from the right. Drawing calls follow VEX’s [IQ2 screen API](https://api.vex.com/iq2/home/python/Screen.html); math libraries follow its [MicroPython library list](https://api.vex.com/iq2/home/python/Micropython_libraries.html). Math is numerically tested and the C++ is compiled against VEX’s SDK; these additions have not been tested on a physical brain.
 
-Start a program with **Events → when started**, then attach blocks underneath it. Those blocks run once in order when the program starts. Existing programs without a start block still work; use one start stack to keep execution order clear.
+Attach blocks underneath **when started**. Those blocks run once in order when the program starts. Existing programs are preserved, including legacy programs without a start block; use **Events → when started** to add one to an older program.
 
 | Category | What it does |
 |---|---|
@@ -72,18 +76,28 @@ Start a program with **Events → when started**, then attach blocks underneath 
 | Motors | Spin (with or without a speed, for a distance, or to a position), stop, set velocity, stopping mode, timeout, torque and position, and read position, velocity, current, done and spinning. |
 | Ports | Raw volts to a motor, Touch LED colour, bumper and distance reads, and "port N device, call anything". |
 | Pins (C++) | Write high or low to one of the 12 ports' prongs, plus pin enable, write, read, digital and analog reads. C++ only. |
-| Controller | Joystick axes A to D and the eight buttons. |
-| Loops | While, repeat, for, break, wait until, wait with units, and start a thread. |
+| Controller | Joystick axes A to D, ten buttons including L3/R3, and tank-drive steps with an enable/disable gate. |
+| Loops | While, repeat, forever, repeat until, for, if/else/else-if, break, wait until, wait with units, stop project, comments, and start a thread. |
 | Logic, Math, Text, Variables | The usual building blocks. |
 | Drivetrain | A setup block (motor ports, wheel size, brain gyro), then drive, drive for a distance, turn, turn for, turn to heading or rotation, velocities, stopping, timeout, and reads for heading, rotation, velocity, current, done and moving. |
 | Looks | Draw pixels, lines, rectangles and circles, set pen and fill colour, pen width and font, next row, clear row, console print and clear, colour sensor light, touch LED brightness and fade. |
-| Sound | Play a note or one of the built-in sounds. |
+| Sound | Play a note with octave/duration, or any of the 16 built-in sounds, including Siren 2, Ratchet 2, Alarm 2 and Power Down. |
 | Sensing | Brain (battery, button, cursor, timer), touch LED, colour sensor, distance sensor, gyro, inertial and optical sensor blocks. |
 | Functions | Your own functions, with number inputs and an optional number result. |
 | Lists (Python) | List blocks. They exist only in Python mode; in C++ mode they leave a comment. |
 | Raw Python | A raw statement, a raw value, a raw `if`, a raw `while`, and a bitwise AND, OR, XOR and shift. The text you type is copied as it is, so in C++ mode it must be C++. |
+| Console | Print with/without a newline, clear, font colours, numeric precision, ask and wait, answer as text/number, screen print precision, and live show/hide value monitors. |
+| Pneumatics | Extend/retract either cylinder or both, and turn the pump on/off. |
+| Motor groups | Configure two/four motors, then use the motor actions and reporters on the group. Motor reversal follows individual motor setup blocks. |
+| Vision | Configure calibrated signatures, snapshot signatures/colour codes, select an object, count/exists, dimensions, position and angle. |
+| AI Vision | Configure colours and colour codes, snapshot colours/codes/AprilTags/model objects, toggle detection modes, select an object, read dimensions/position/angle/score/classification/tag ID. |
+| Data, Lists, 2D lists | Boolean variables and named numeric/text lists in both languages, initial items, length/shape, replace and read. Indexing starts at 1; dimensions are bounded to 64 × 64. |
+| Useful | Map a value between ranges, clamp, and joystick deadband. |
+| Switch | Raw Boolean/number reporters and a raw startup stack, alongside the existing raw statements and C-shaped controls. |
 
-These cover the blocks documented for VEXcode IQ (2nd gen). Left out: the vision sensor and GPS blocks (they need a configured sensor), and the "monitor" blocks (a VEXcode window feature). Use the raw blocks for those.
+The hardware block families are checked against the [VEXcode IQ2 block reference](https://api.vex.com/iq2/home/blocks/index.html) and the installed IQ2 Python stubs/C++ headers. Vision requires sensor calibration: paste exported signature/colour values into setup blocks, and configure AI models in VEX's Vision Utility. Merely selecting a port does not calibrate a sensor. Hardware-specific sensing needs the corresponding connected device. Console monitors sample a global variable or sensor reporter every 250 ms and display up to 32 named readings; local function parameters/loop variables are unsupported. GPS is outside the IQ2 block reference. The original **Lists (Python)** category remains Python-only; the new named **Lists** and **2D lists** categories support both languages.
+
+The live console pauses and reconnects around downloads, program control and VM installation so it releases the USB port for `vexcom`. Failed transfers include port-owner diagnostics; version errors include the detected brain firmware and SDK target, rather than assuming firmware is outdated. Transfers that have started are not retried automatically.
 
 ## How it works
 
@@ -100,7 +114,7 @@ These cover the blocks documented for VEXcode IQ (2nd gen). Left out: the vision
 ```
 
 - **The page** (`public/index.html`) uses Google's Blockly library to draw the blocks. The files `public/iq-blocks.js` (Python) and `public/iq-cpp.js` (C++) turn each block into code. Both live in the page, so what you see in the code box is exactly what gets sent.
-- **The server** (`server.js`) is a small local web server. It never talks to the brain itself. It runs VEX's own tools and passes their output back to the page.
+- **The server** (`server.js`) is a small local web server. It runs VEX's own tools for device discovery, downloads and execution. The optional live console uses `serialport` to open only the brain user port discovered by `vexcom`, at 115200 baud, and streams text to the browser through server-sent events.
 - **`vexcom`** is VEX's download tool. It ships inside VEX's VS Code extension, and on first start the server copies it to `~/.iq-raw/vexcom`. It speaks the brain's USB protocol, packages Python programs the way the brain expects, and writes the program into the slot. This is why iq-raw does not need its own copy of the protocol.
 - **C++ builds** use VEX's own SDK, clang compiler and project makefile, taken from the same VS Code extension. The server unzips VEX's empty IQ (2nd gen) C++ project into a temporary folder, drops your `main.cpp` in, runs `make`, and sends the `.bin` it produces. The temporary folder is deleted afterwards.
 - **Pins:** the Python on the brain has no pin calls. The C++ SDK does: `vexGenericDigitalEnable`, `vexGenericDigitalOutput`, `vexGenericDigitalInput`, `vexDigitalPinGet`, `vexAnalogPinGet`. The headers do not explain what the pin number and options mean. The one-block "write to prong of port N" uses enable options 0 and pin 0 as a starting guess.
@@ -113,7 +127,9 @@ These cover the blocks documented for VEXcode IQ (2nd gen). Left out: the vision
 - `public/iq-blocks.js` : block definitions, the Python generator, the toolbox.
 - `public/iq-cpp.js` : the C++ generator.
 - `public/iq-catalog.js` : the table of most IQ blocks (label, Python and C++ for each); both generators are built from it.
-- `test/blocks.test.mjs`, `test/catalog.test.mjs` : check the generators and the server's guards, compile a pin program, and build every catalog block in both languages (the Python must parse and the C++ must compile with VEX's compiler, with every dropdown option). Run them with `npm test`.
+- `public/iq-vex.js` : console, pneumatics, motor groups, Vision/AI Vision, data, lists and additional control/operator blocks.
+- `public/editor-ui.js`, `public/console-renderer.js`, `serial-console.js` : drag-only toolbox, fullscreen/panel controls, and the live USB console.
+- `test/*.test.mjs` : check generator output, server guards, numerical math, starter/drag/fullscreen behavior, and mocked serial I/O/ANSI rendering. Catalog and added VEX blocks are generated with every dropdown option, Python is parsed, and C++ is compiled against VEX's SDK when installed. Run with `npm test`. Serial mocks do not substitute for physical-brain console testing.
 
 ## Testing with a real brain
 

@@ -13,10 +13,16 @@
 <header>
   <div class="appbar">
     <div class="brand"><span class="brand-mark" aria-hidden="true">IQ</span><div><h1>IQ Raw</h1><p>Your robot. Your code.</p></div></div>
-    <a class="button-link" href="/settings.html">Settings</a>
+    <div class="view-actions" aria-label="Editor views">
+      <button id="controlsToggle" type="button" aria-controls="programConfig" aria-expanded="true">Program controls</button>
+      <button id="codeToggle" type="button" aria-controls="sourcePanel" aria-pressed="true">Code</button>
+      <button id="consoleToggle" type="button" aria-controls="consolePanel" aria-pressed="true">Console</button>
+      <button id="fullscreenToggle" type="button" aria-pressed="false">Fullscreen</button>
+    </div>
+    <a id="settingsLink" class="button-link" href="/settings.html">Settings</a>
   </div>
   <div class="toolbar" aria-label="Program controls">
-    <div class="control-group">
+    <div class="control-group" id="programConfig">
       <label>Language <select id="lang"><option value="python">Python</option><option value="cpp">C++</option></select></label>
       <label>Slot <select id="slot"></select></label>
       <label>Name <input type="text" id="name" maxlength="32" value="iq-raw"></label>
@@ -28,7 +34,7 @@
       <button id="stop">Stop</button>
       <button id="build" title="Compile without sending to the brain" hidden>Build only</button>
     </div>
-    <div class="control-group">
+    <div class="control-group device-tools">
       <button id="vm" title="Install once per brain, and again after a VEXos update">Install Python VM</button>
     </div>
   </div>
@@ -38,9 +44,10 @@
   <section id="blocks" class="editor-panel" aria-labelledby="blocksHeading">
     <div class="panel-heading"><h2 id="blocksHeading">Block workspace</h2><span>Build something that moves</span></div>
     <div id="blocklyDiv"></div>
-    <div class="panel-foot">Start with Events → when started · Scroll to zoom · Drag to explore</div>
+    <div class="panel-foot">Drag blocks onto the canvas · Scroll to zoom · Escape exits fullscreen</div>
   </section>
-  <aside class="editor-panel" aria-labelledby="codeHeading">
+  <aside id="codeSidebar" class="editor-panel" aria-label="Code and console panels">
+    <section id="sourcePanel" aria-labelledby="codeHeading">
     <div class="panel-heading"><h2 id="codeHeading">Your code</h2><span id="codeMode">Synced with blocks</span></div>
     <div class="bar">
       <label><input type="checkbox" id="manual"> Edit code by hand</label>
@@ -52,8 +59,13 @@
       <input type="file" id="file" accept=".py,.cpp,text/x-python,text/plain" hidden>
     </div>
     <textarea id="code" aria-label="Program source code" spellcheck="false" readonly></textarea>
-    <div class="panel-heading console-heading"><h2>Console</h2><span>Build &amp; device output</span></div>
-    <pre id="log" aria-label="Tool output"></pre>
+    </section>
+    <section id="consolePanel" aria-labelledby="consoleHeading">
+      <div class="panel-heading console-heading"><h2 id="consoleHeading">Console</h2><span id="consoleStatus">Tool output · brain disconnected</span><div class="console-actions"><button id="consoleConnect" type="button">Connect brain</button><button id="consoleClear" type="button">Clear</button><button id="consoleCopy" type="button">Copy</button></div></div>
+      <dl id="liveMonitors" aria-label="Live value monitors" hidden></dl>
+      <pre id="log" aria-label="Console output" tabindex="0"></pre>
+      <form id="consoleForm"><label class="sr-only" for="consoleInput">Send a line to the brain</label><input id="consoleInput" type="text" placeholder="Send a line to the brain…" autocomplete="off" disabled><button id="consoleSend" type="submit" disabled>Send</button></form>
+    </section>
   </aside>
 </main>
 <script src="/vendor/blockly/blockly_compressed.js"></script>
@@ -64,6 +76,9 @@
 <script src="/iq-cpp.js"></script>
 <script src="/iq-catalog.js"></script>
 <script src="/iq-math.js"></script>
+<script src="/iq-vex.js"></script>
+<script src="/editor-ui.js"></script>
+<script src="/console-renderer.js"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -86,7 +101,7 @@
     if (!r.ok) throw new Error(j.error || r.statusText);
     return j;
   };
-  const busy = (on) => document.querySelectorAll('header button, #refresh').forEach((b) => (b.disabled = on));
+  const busy = (on) => ['send','sendOnly','run','stop','build','vm','refresh'].forEach(id => ($(id).disabled = on));
   async function action(label, path, body) {
     busy(true); log('> ' + label);
     try {
@@ -107,7 +122,7 @@
   // ---- blocks and code ----
   // CSS variables keep Blockly in sync with the selected app theme.
   const theme = Blockly.Theme.defineTheme('iqraw', {
-    base: Blockly.Themes.Classic,
+    base: Blockly.Themes.Zelos,
     componentStyles: {
       workspaceBackgroundColour: 'var(--panel)',
       toolboxBackgroundColour: 'var(--panel)',
@@ -118,7 +133,7 @@
       scrollbarColour: 'var(--muted)',
     },
   });
-  const ws = Blockly.inject('blocklyDiv', { theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
+  const ws = Blockly.inject('blocklyDiv', { renderer: 'zelos', theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
   new ResizeObserver(() => Blockly.svgResize(ws)).observe($('blocklyDiv'));
   const code = $('code');
   let manual = store.get('manual', '0') === '1';
@@ -134,7 +149,8 @@
     code.value = generate() || STARTERS[lang];
     store.set('code.' + lang, code.value);
   }
-  try { const saved = store.get('ws', ''); if (saved) Blockly.serialization.workspaces.load(JSON.parse(saved), ws); } catch { /* bad saved workspace */ }
+  IQEditor.restore(ws, store.get('ws', ''));
+  store.set('ws', JSON.stringify(Blockly.serialization.workspaces.save(ws)));
   code.value = manual ? store.get('code.' + lang, STARTERS[lang]) : generate() || STARTERS[lang];
   applyMode();
   const showLang = () => { $('vm').hidden = lang === 'cpp'; $('probe').hidden = lang === 'cpp'; $('build').hidden = lang !== 'cpp'; };
@@ -212,6 +228,7 @@
   $('run').onclick = () => action(`run slot ${slot()}`, 'run', { slot: slot() });
   $('stop').onclick = () => action('stop', 'stop', {});
   $('vm').onclick = () => confirm('Put the Python VM on the brain now? This takes a minute. Do not unplug it.') && action('install Python VM', 'python-vm', {});
+  IQEditor.setup(ws, {api, log});
   checkBrain();
 })();
 </script>

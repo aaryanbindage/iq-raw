@@ -138,12 +138,15 @@ try {
   fs.writeFileSync(tool, `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+if(!args.includes('--write')){console.log(JSON.stringify({iq2:{brain:{vexos:'0x01000900'},vms:{items:[{binfile:'python_vm.bin'}]}}}));process.exit(0);}
 const file = args[args.indexOf('--write') + 1];
 fs.appendFileSync(process.env.IQRAW_TEST_CALLS, JSON.stringify({ args, file, source: fs.readFileSync(file, 'utf8') }) + '\\n');
 if (process.env.IQRAW_TEST_MODE === 'signal') process.kill(process.pid, 'SIGTERM');
 else if (process.env.IQRAW_TEST_MODE === 'old' && args.includes('--name')) { console.error('unknown option --name'); process.exitCode = 7; }
 else if (process.env.IQRAW_TEST_MODE === 'silent') { console.error('Device: /dev/tty.usbmodem101\\nvexcom utility V1.0.2b2'); process.exitCode = 1; }
 else if (process.env.IQRAW_TEST_MODE === 'port') process.exitCode = 6;
+else if (process.env.IQRAW_TEST_MODE === 'version') process.exitCode = 3;
+else if (process.env.IQRAW_TEST_MODE === 'partial') {console.log('{"phase":"program","action":"download","percent":7}');console.error('unknown response; usage unavailable');process.exitCode=4;}
 else console.log('{"status":0,"message":"Download complete"}');
 `);
   fs.chmodSync(tool, 0o755);
@@ -167,6 +170,13 @@ else console.log('{"status":0,"message":"Download complete"}');
   assert.ok(!fs.existsSync(first.file), 'temporary code should be cleaned after failure');
   const port = await send('port');
   assert.match(port.out, /code 6 \(serial port error/);
+  const version = await send('version');
+  assert.match(version.out,/Brain VEXos: 1\.0\.9\.0/);
+  assert.match(version.out,/Python VM is installed/);
+  const beforePartial=attempts().length;
+  const partial=await send('partial');
+  assert.equal(partial.ok,false);
+  assert.equal(attempts().length-beforePartial,1,'A partially completed download must never trigger the option fallback');
   const killed = await send('signal');
   assert.equal(killed.ok, false);
   assert.match(killed.out, /terminated by SIGTERM/);

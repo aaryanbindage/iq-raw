@@ -173,7 +173,7 @@
   };
   const controller = (g) => { g.definitions_.controller = 'vex::controller Controller;'; return 'Controller'; };
   const dirName = (d) => (d === 'REVERSE' ? 'reverse' : 'forward');
-  const isText = (b, name) => { const t = b.getInputTargetBlock(name); return !!t && (t.type === 'text' || t.type === 'text_join'); };
+  const isText = (b, name) => { const t = b.getInputTargetBlock(name); return !!t && (t.type === 'text' || t.type === 'text_join' || t.outputConnection?.getCheck()?.includes('String')); };
   const portIndex = (b) => `PORT${b.getFieldValue('PORT')}`;
 
   F.iq_print = (b, g) => {

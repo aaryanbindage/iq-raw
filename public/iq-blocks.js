@@ -5,7 +5,7 @@
   const PORTS = Array.from({ length: 12 }, (_, i) => [String(i + 1), String(i + 1)]);
   const DIRS = [['forward', 'FORWARD'], ['reverse', 'REVERSE']];
   const AXES = [['A (left stick, up/down)', 'A'], ['B (left stick, left/right)', 'B'], ['C (right stick, left/right)', 'C'], ['D (right stick, up/down)', 'D']];
-  const BUTTONS = [['L up', 'LUp'], ['L down', 'LDown'], ['R up', 'RUp'], ['R down', 'RDown'], ['E up', 'EUp'], ['E down', 'EDown'], ['F up', 'FUp'], ['F down', 'FDown']];
+  const BUTTONS = [['L up', 'LUp'], ['L down', 'LDown'], ['R up', 'RUp'], ['R down', 'RDown'], ['E up', 'EUp'], ['E down', 'EDown'], ['F up', 'FUp'], ['F down', 'FDown'], ['L3', 'L3'], ['R3', 'R3']];
   const COLORS = ['RED', 'GREEN', 'BLUE', 'YELLOW', 'ORANGE', 'PURPLE', 'CYAN', 'WHITE', 'BLACK'].map((c) => [c.toLowerCase(), c]);
   const DEVICES = [['Touchled', 'Touchled'], ['Bumper', 'Bumper'], ['Distance', 'Distance'], ['Optical', 'Optical'], ['Motor', 'Motor']];
   const COLOUR = { brain: 200, motor: 20, control: 290, port: 50, pin: 90, raw: 0 };

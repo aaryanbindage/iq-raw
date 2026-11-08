@@ -26,21 +26,21 @@
   const STOP = ['BRAKE', 'COAST', 'HOLD'];
   const AMP = ['CurrentUnits.AMP'];
   const WAIT = [['and wait', 'True'], ["don't wait", 'False']];
-  const COLORS = ['RED', 'GREEN', 'BLUE', 'YELLOW', 'ORANGE', 'PURPLE', 'CYAN', 'WHITE', 'BLACK', 'TRANSPARENT'].map((c) => 'Color.' + c);
+  const COLORS = ['RED', 'GREEN', 'BLUE', 'YELLOW', 'ORANGE', 'PURPLE', 'CYAN', 'WHITE', 'BLACK', 'TRANSPARENT', 'RED_VIOLET', 'VIOLET', 'BLUE_VIOLET', 'BLUE_GREEN', 'YELLOW_GREEN', 'YELLOW_ORANGE', 'RED_ORANGE'].map((c) => 'Color.' + c);
   const FONTS = ['MONO12', 'MONO15', 'MONO20', 'MONO30', 'MONO40', 'MONO60', 'PROP20', 'PROP30', 'PROP40'].map((f) => 'FontType.' + f);
-  const SOUNDS = ['SIREN', 'WRONG_WAY', 'WRONG_WAY_SLOW', 'FILLUP', 'HEADLIGHTS_ON', 'HEADLIGHTS_OFF', 'TOLLBOOTH', 'ALARM', 'TADA', 'DOOR_CLOSE', 'RATCHET', 'WRENCH'].map((s) => 'SoundType.' + s);
+  const SOUNDS = ['SIREN', 'WRONG_WAY', 'WRONG_WAY_SLOW', 'FILLUP', 'HEADLIGHTS_ON', 'HEADLIGHTS_OFF', 'TOLLBOOTH', 'ALARM', 'TADA', 'DOOR_CLOSE', 'RATCHET', 'WRENCH', 'SIREN2', 'RATCHET2', 'ALARM2', 'POWER_DOWN'].map((s) => 'SoundType.' + s);
   const AXES = ['AxisType.XAXIS', 'AxisType.YAXIS', 'AxisType.ZAXIS'];
   const ORIENT = ['OrientationType.PITCH', 'OrientationType.ROLL', 'OrientationType.YAW'];
   const GYROCAL = ['GyroCalibrationType.NORMAL', 'GyroCalibrationType.SLOW', 'GyroCalibrationType.EXTENDED'];
   const FADES = ['FadeType.SLOW', 'FadeType.FAST', 'FadeType.OFF'];
   const LED = ['LedStateType.ON', 'LedStateType.OFF'];
   const CAXIS = ['A', 'B', 'C', 'D'].map((a) => [a, a]);
-  const CBTN = ['LUp', 'LDown', 'RUp', 'RDown', 'EUp', 'EDown', 'FUp', 'FDown'].map((b) => [b, b]);
+  const CBTN = ['LUp', 'LDown', 'RUp', 'RDown', 'EUp', 'EDown', 'FUp', 'FDown', 'L3', 'R3'].map((b) => [b, b]);
 
   // ---- Python token -> C++ token ----
   const CPP_TOKEN = {
     'SoundType.WRONG_WAY': 'wrongWay', 'SoundType.WRONG_WAY_SLOW': 'wrongWaySlow', 'SoundType.HEADLIGHTS_ON': 'headlightsOn',
-    'SoundType.HEADLIGHTS_OFF': 'headlightsOff', 'SoundType.TOLLBOOTH': 'tollBooth', 'SoundType.DOOR_CLOSE': 'doorClose',
+    'SoundType.HEADLIGHTS_OFF': 'headlightsOff', 'SoundType.TOLLBOOTH': 'tollBooth', 'SoundType.DOOR_CLOSE': 'doorClose', 'SoundType.POWER_DOWN': 'powerDown',
     'GyroCalibrationType.NORMAL': 'calNormal', 'GyroCalibrationType.SLOW': 'calSlow', 'GyroCalibrationType.EXTENDED': 'calExtended',
     'LedStateType.ON': 'ledState::on', 'LedStateType.OFF': 'ledState::off',
   };
@@ -284,7 +284,7 @@
     }
   }
 
-  const isText = (b, name) => { const t = b.getInputTargetBlock(name); return !!t && (t.type === 'text' || t.type === 'text_join'); };
+  const isText = (b, name) => { const t = b.getInputTargetBlock(name); return !!t && (t.type === 'text' || t.type === 'text_join' || t.outputConnection?.getCheck()?.includes('String')); };
 
   function fill(lang, g, s, b, tpl, extra = {}) {
     return tpl.replace(/\{(\w+)\}/g, (m, n) => {
