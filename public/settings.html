@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · IQ Raw</title>
+<script src="/theme.js"></script>
+<script src="/preferences.js"></script>
+<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header><div class="appbar">
+  <div class="brand"><span class="brand-mark" aria-hidden="true">IQ</span><div><h1>IQ Raw</h1><p>Make it yours</p></div></div>
+  <a href="/" class="button-link">← Back to editor</a>
+</div></header>
+<div class="settings-layout">
+  <nav class="settings-nav" aria-label="Settings sections">
+    <a href="#appearance">Appearance</a>
+    <a href="#editor">Editor</a>
+    <a href="#program">Program defaults</a>
+  </nav>
+  <div class="settings-content">
+    <h1>Settings</h1>
+    <p>A workspace that feels like yours. Changes save automatically in this browser.</p>
+    <section id="appearance" class="settings-card editor-panel">
+      <h2>Appearance</h2><p>Set the mood, from a clean workspace to a little more atmosphere.</p>
+      <div class="setting-row"><div><label for="theme">Theme</label><p>System follows your device’s light or dark appearance.</p></div>
+        <select id="theme"><optgroup label="Essentials"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="contrast">High Contrast</option></optgroup><optgroup label="Patterned"><option value="aurora">Aurora</option><option value="blueprint">Blueprint</option><option value="circuit">Circuit</option><option value="sunset">Sunset</option></optgroup></select>
+      </div>
+      <div class="theme-previews" aria-label="Patterned theme previews">
+        <button type="button" data-preview="aurora"><span class="swatch aurora" aria-hidden="true"></span>Aurora<small>Soft light &amp; diagonal ribbons</small></button>
+        <button type="button" data-preview="blueprint"><span class="swatch blueprint" aria-hidden="true"></span>Blueprint<small>Layered engineering grids</small></button>
+        <button type="button" data-preview="circuit"><span class="swatch circuit" aria-hidden="true"></span>Circuit<small>Connected traces &amp; nodes</small></button>
+        <button type="button" data-preview="sunset"><span class="swatch sunset" aria-hidden="true"></span>Sunset<small>Warm gradients &amp; contour lines</small></button>
+      </div>
+      <div class="setting-row"><div><label for="pattern">Background decoration</label><p>Patterns span the page, header, and canvas. Turn them off for a quieter workspace.</p></div><select id="pattern"><option value="subtle">Subtle patterns</option><option value="off">Plain backgrounds</option></select></div>
+    </section>
+    <section id="editor" class="settings-card editor-panel">
+      <h2>Editor</h2><p>Keep your code and blocks comfortable to work with.</p>
+      <div class="setting-row"><div><label for="fontSize">Code text size</label><p>Applies to generated code and editing by hand.</p></div><select id="fontSize"><option value="12">12 px · Compact</option><option value="14">14 px · Default</option><option value="16">16 px · Comfortable</option><option value="18">18 px · Large</option><option value="22">22 px · Extra large</option></select></div>
+      <div class="setting-row"><div><label for="grid">Alignment dots</label><p>Show the dot grid behind your blocks. Blocks still snap into alignment.</p></div><select id="grid"><option value="on">Show dots</option><option value="off">Hide dots</option></select></div>
+    </section>
+    <section id="program" class="settings-card editor-panel">
+      <h2>Program defaults</h2><p>The same language, slot, and name used by the editor. Changing language keeps each language’s saved code.</p>
+      <div class="setting-row"><div><label for="lang">Language</label><p>Generate Python or C++ from your blocks.</p></div><select id="lang"><option value="python">Python</option><option value="cpp">C++</option></select></div>
+      <div class="setting-row"><div><label for="slot">Brain slot</label><p>Where downloads are stored on the brain.</p></div><select id="slot"><option value="1">Slot 1</option><option value="2">Slot 2</option><option value="3">Slot 3</option><option value="4">Slot 4</option><option value="5">Slot 5</option><option value="6">Slot 6</option><option value="7">Slot 7</option><option value="8">Slot 8</option></select></div>
+      <div class="setting-row"><div><label for="name">Program name</label><p>The name shown on the brain.</p></div><input type="text" id="name" maxlength="32" value="iq-raw"></div>
+    </section>
+    <p id="settingsStatus" role="status">Changes save automatically.</p>
+  </div>
+</div>
+<script src="/settings.js"></script>
+</body>
+</html>

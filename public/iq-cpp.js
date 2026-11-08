@@ -117,6 +117,7 @@
   F.text_join = (b, g) => ['"(text join is not supported in C++ mode)"', g.ORDER_ATOMIC];
 
   // ---- IQ blocks ----
+  F.iq_when_started = () => '// When started\n';
   const sleepMs = (x) => `this_thread::sleep_for((uint32_t)(${x}));`;
   const motor = (g, port) => {
     const key = 'motor_' + port;

@@ -1,6 +1,6 @@
 // Apply the saved theme before the page paints, including the Blockly canvas.
 (() => {
-  const choices = ['system', 'light', 'dark', 'midnight', 'contrast'];
+  const choices = ['system', 'light', 'dark', 'midnight', 'contrast', 'aurora', 'blueprint', 'circuit', 'sunset'];
   const system = matchMedia('(prefers-color-scheme: dark)');
   let preference = 'system';
   try {
@@ -17,6 +17,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const select = document.getElementById('theme');
+    if (!select) return; // The editor applies the saved theme; selection lives in Settings.
     select.value = preference;
     select.addEventListener('change', () => {
       preference = choices.includes(select.value) ? select.value : 'system';

@@ -1,0 +1,42 @@
+:root { color-scheme: light; --bg:#f6f7f9; --panel:#fff; --ink:#1c2230; --muted:#5d6678; --line:#d5d9e2; --accent:#1f6feb; --accentink:#fff; --bad:#b42318; --good:#1a7f37; --code:#0f1420; --codeink:#e6e9f0; }
+  :root[data-theme="dark"] { color-scheme: dark; --bg:#12151c; --panel:#1b1f29; --ink:#e6e9f0; --muted:#98a1b3; --line:#2f3646; --accent:#5b9cff; --accentink:#101722; --bad:#ff7b72; --good:#56d364; --code:#0b0e14; }
+  :root[data-theme="midnight"] { color-scheme: dark; --bg:#0b1024; --panel:#141d38; --ink:#eef2ff; --muted:#b1bddb; --line:#35436c; --accent:#b5a1ff; --accentink:#18102e; --bad:#ff9baf; --good:#67e8c3; --code:#080d1d; --codeink:#eef2ff; }
+  :root[data-theme="contrast"] { color-scheme: dark; --bg:#000; --panel:#000; --ink:#fff; --muted:#eee; --line:#777; --accent:#ffeb3b; --accentink:#000; --bad:#ff9c9c; --good:#8dffad; --code:#000; --codeink:#fff; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; }
+  label { color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  select, input[type=text], button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; }
+  input[type=text] { width: 130px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accentink); }
+  #themeSwitch { color: var(--ink); font-weight: 600; }
+  select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .spacer { flex: 1; }
+  #brain { font-size: 13px; color: var(--muted); }
+  #brain.ok { color: var(--good); }
+  #brain.bad { color: var(--bad); }
+  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); min-height: 0; }
+  #blocks { min-height: 0; border-right: 1px solid var(--line); }
+  #blocklyDiv { width: 100%; height: 100%; }
+  /* Blockly's light toolbox otherwise inherits pale text from our dark theme. */
+  #blocklyDiv .blocklyToolboxDiv { background: var(--panel); color: var(--ink); }
+  #blocklyDiv .blocklyTreeRow { height: 32px; line-height: 32px; padding-right: 12px; }
+  #blocklyDiv .blocklyTreeLabel { color: var(--ink); font: 600 17px/1.4 system-ui, -apple-system, sans-serif; }
+  /* Override Blockly's inline category background; keep the coloured border. */
+  #blocklyDiv .blocklyTreeSelected { background-color: var(--line) !important; }
+  #blocklyDiv .blocklyTreeRow:not(.blocklyTreeSelected):hover { background-color: var(--bg); }
+  #blocklyDiv .blocklyToolboxDiv:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  aside { display: flex; flex-direction: column; min-height: 0; }
+  .bar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #code { flex: 1; min-height: 0; width: 100%; resize: none; border: 0; outline: 0; padding: 10px 12px; background: var(--code); color: var(--codeink); font: 13px/1.5 ui-monospace, Menlo, monospace; tab-size: 4; white-space: pre; overflow: auto; }
+  #code[readonly] { opacity: .85; }
+  :root[data-theme="contrast"] #code[readonly] { opacity: 1; }
+  :root[data-theme="contrast"] #blocklyDiv .blocklyTreeSelected { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #log { height: 30%; min-height: 90px; margin: 0; padding: 8px 12px; overflow: auto; background: var(--panel); border-top: 1px solid var(--line); font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+  #log .err { color: var(--bad); } #log .okk { color: var(--good); }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #blocks { border-right: 0; border-bottom: 1px solid var(--line); } }

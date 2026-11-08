@@ -45,10 +45,15 @@ To run it again later: `cd iq-raw && npm start`. To stop it: Ctrl+C in that Term
 
 Other buttons: **Open .py** and **Save .py** load and save the code box as a file (`.cpp` in C++ mode). **Programs on brain** lists what is stored. **Probe brain API** (Python) runs a small program that prints which calls the brain's Python offers.
 
+**Make it yours:** open **Settings → Appearance** for System, Light, Dark, Midnight, High Contrast, or the patterned Aurora, Blueprint, Circuit, and Sunset themes. Settings also includes theme previews, plain or patterned backgrounds, alignment dots, code text size, and saved language, slot, and name. Preferences save automatically in this browser.
+
 ### The blocks
+
+Start a program with **Events → when started**, then attach blocks underneath it. Those blocks run once in order when the program starts. Existing programs without a start block still work; use one start stack to keep execution order clear.
 
 | Category | What it does |
 |---|---|
+| Events | A “when started” entry block for Python and C++. |
 | Brain | Print to the brain screen, clear it, move the cursor, wait. |
 | Motors | Set a motor up (port, reversed), spin it at a percent, spin it a number of degrees, stop it. |
 | Ports | Raw volts to a motor, Touch LED colour, bumper and distance reads, and "port N device, call anything". |

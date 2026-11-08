@@ -51,12 +51,47 @@ for (const want of [
 ]) assert.ok(cppOut.includes(want), 'missing in C++: ' + want);
 console.log('ok - C++ generator');
 
+// A startup hat is a top-level entry point; its attached stack runs once in order.
+const startup = new Blockly.Workspace();
+Blockly.serialization.workspaces.load({ blocks: { languageVersion: 0, blocks: [chain([
+  { type: 'iq_when_started' },
+  { type: 'controls_repeat_ext', inputs: { TIMES: n(2), DO: { block: { type: 'iq_clear' } } } },
+  { type: 'iq_motor_spin', fields: { PORT: '2', DIR: 'FORWARD' }, inputs: { SPEED: n(25) } },
+  { type: 'iq_motor_stop', fields: { PORT: '2' } },
+])] } }, startup);
+const start = startup.getTopBlocks()[0];
+assert.equal(start.previousConnection, null);
+assert.ok(start.nextConnection);
+assert.equal(start.hat, 'cap');
+const startupPy = pythonGenerator.workspaceToCode(startup);
+const startupCpp = Blockly.Cpp.workspaceToCode(startup);
+assert.match(startupPy, /# When started\nfor .* in range\(2\):\n    brain.screen.clear_screen\(\)/);
+assert.match(startupPy, /motor_2.spin\(FORWARD, 25, PERCENT\)\nmotor_2.stop\(\)/);
+assert.match(startupCpp, /\/\/ When started\n    for \(int i_0 = 0;/);
+assert.match(startupCpp, /motor_2.spin\(forward, 25, percent\);\n    motor_2.stop\(\);/);
+assert.equal((startupCpp.match(/int main\(/g) || []).length, 1);
+const restored = new Blockly.Workspace();
+Blockly.serialization.workspaces.load(Blockly.serialization.workspaces.save(startup), restored);
+assert.equal(restored.getTopBlocks()[0].hat, 'cap');
+assert.equal(pythonGenerator.workspaceToCode(restored), startupPy);
+assert.equal(Blockly.Cpp.workspaceToCode(restored), startupCpp);
+startup.clear();
+startup.newBlock('iq_when_started');
+assert.match(pythonGenerator.workspaceToCode(startup), /# When started/);
+assert.match(Blockly.Cpp.workspaceToCode(startup), /int main\(\)/);
+startup.dispose();
+restored.dispose();
+console.log('ok - startup block, execution order, empty stack and saved workspace');
+
 // server guards
 process.env.PORT = '5199';
 const { server } = require('../server.js');
 await new Promise((r) => server.listen(5199, '127.0.0.1', r));
 const get = (p, h = {}) => fetch('http://127.0.0.1:5199' + p, { headers: h });
 assert.equal((await get('/')).status, 200);
+for (const asset of ['/settings.html', '/base.css', '/app.css', '/theme.js', '/preferences.js', '/settings.js']) {
+  assert.equal((await get(asset)).status, 200, asset + ' should be served');
+}
 assert.equal((await get('/vendor/blockly/blockly_compressed.js')).status, 200);
 assert.equal((await get('/vendor/blockly/../../package.json')).status, 404);
 assert.equal((await get('/%2e%2e/server.js')).status, 404);

@@ -10,7 +10,9 @@
   const DEVICES = [['Touchled', 'Touchled'], ['Bumper', 'Bumper'], ['Distance', 'Distance'], ['Optical', 'Optical'], ['Motor', 'Motor']];
   const COLOUR = { brain: 200, motor: 20, control: 290, port: 50, pin: 90, raw: 0 };
 
+  Blockly.Extensions.register('iq_start_hat', function () { this.hat = 'cap'; });
   Blockly.defineBlocksWithJsonArray([
+    { type: 'iq_when_started', message0: 'when started', nextStatement: null, colour: 45, extensions: ['iq_start_hat'], tooltip: 'Blocks attached below run once when the program starts. Use one start stack for a predictable execution order.' },
     { type: 'iq_print', message0: 'brain screen print %1', args0: [{ type: 'input_value', name: 'TEXT' }], previousStatement: null, nextStatement: null, colour: COLOUR.brain },
     { type: 'iq_clear', message0: 'brain screen clear', previousStatement: null, nextStatement: null, colour: COLOUR.brain },
     { type: 'iq_cursor', message0: 'brain screen cursor row %1 column %2', args0: [{ type: 'input_value', name: 'ROW', check: 'Number' }, { type: 'input_value', name: 'COL', check: 'Number' }], inputsInline: true, previousStatement: null, nextStatement: null, colour: COLOUR.brain },
@@ -55,6 +57,7 @@
   const num = (g, block, name, fallback) => g.valueToCode(block, name, g.ORDER_NONE) || fallback;
   const F = gen.forBlock;
 
+  F.iq_when_started = (b, g) => { base(g); return '# When started\n'; };
   F.iq_print = (b, g) => { base(g); return `brain.screen.print(${num(g, b, 'TEXT', '""')})\n`; };
   F.iq_clear = (b, g) => { base(g); return 'brain.screen.clear_screen()\nbrain.screen.set_cursor(1, 1)\n'; };
   F.iq_cursor = (b, g) => { base(g); return `brain.screen.set_cursor(${num(g, b, 'ROW', '1')}, ${num(g, b, 'COL', '1')})\n`; };
@@ -107,6 +110,9 @@
   Blockly.IQ_TOOLBOX = {
     kind: 'categoryToolbox',
     contents: [
+      { kind: 'category', name: 'Events', colour: '45', contents: [
+        { kind: 'block', type: 'iq_when_started' },
+      ] },
       { kind: 'category', name: 'Brain', colour: String(COLOUR.brain), contents: [
         { kind: 'block', type: 'iq_print', inputs: { TEXT: { shadow: { type: 'text', fields: { TEXT: 'Hello IQ' } } } } },
         { kind: 'block', type: 'iq_clear' },

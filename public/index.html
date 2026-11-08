@@ -5,82 +5,55 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IQ Raw</title>
 <script src="/theme.js"></script>
-<style>
-  :root { color-scheme: light; --bg:#f6f7f9; --panel:#fff; --ink:#1c2230; --muted:#5d6678; --line:#d5d9e2; --accent:#1f6feb; --accentink:#fff; --bad:#b42318; --good:#1a7f37; --code:#0f1420; --codeink:#e6e9f0; }
-  :root[data-theme="dark"] { color-scheme: dark; --bg:#12151c; --panel:#1b1f29; --ink:#e6e9f0; --muted:#98a1b3; --line:#2f3646; --accent:#5b9cff; --accentink:#101722; --bad:#ff7b72; --good:#56d364; --code:#0b0e14; }
-  :root[data-theme="midnight"] { color-scheme: dark; --bg:#0b1024; --panel:#141d38; --ink:#eef2ff; --muted:#b1bddb; --line:#35436c; --accent:#b5a1ff; --accentink:#18102e; --bad:#ff9baf; --good:#67e8c3; --code:#080d1d; --codeink:#eef2ff; }
-  :root[data-theme="contrast"] { color-scheme: dark; --bg:#000; --panel:#000; --ink:#fff; --muted:#eee; --line:#777; --accent:#ffeb3b; --accentink:#000; --bad:#ff9c9c; --good:#8dffad; --code:#000; --codeink:#fff; }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; }
-  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 15px; margin: 0 8px 0 0; }
-  label { color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
-  select, input[type=text], button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; }
-  input[type=text] { width: 130px; }
-  button { cursor: pointer; }
-  button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accentink); }
-  #themeSwitch { color: var(--ink); font-weight: 600; }
-  select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  button:disabled { opacity: .5; cursor: default; }
-  .spacer { flex: 1; }
-  #brain { font-size: 13px; color: var(--muted); }
-  #brain.ok { color: var(--good); }
-  #brain.bad { color: var(--bad); }
-  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); min-height: 0; }
-  #blocks { min-height: 0; border-right: 1px solid var(--line); }
-  #blocklyDiv { width: 100%; height: 100%; }
-  /* Blockly's light toolbox otherwise inherits pale text from our dark theme. */
-  #blocklyDiv .blocklyToolboxDiv { background: var(--panel); color: var(--ink); }
-  #blocklyDiv .blocklyTreeRow { height: 32px; line-height: 32px; padding-right: 12px; }
-  #blocklyDiv .blocklyTreeLabel { color: var(--ink); font: 600 17px/1.4 system-ui, -apple-system, sans-serif; }
-  /* Override Blockly's inline category background; keep the coloured border. */
-  #blocklyDiv .blocklyTreeSelected { background-color: var(--line) !important; }
-  #blocklyDiv .blocklyTreeRow:not(.blocklyTreeSelected):hover { background-color: var(--bg); }
-  #blocklyDiv .blocklyToolboxDiv:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  aside { display: flex; flex-direction: column; min-height: 0; }
-  .bar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  #code { flex: 1; min-height: 0; width: 100%; resize: none; border: 0; outline: 0; padding: 10px 12px; background: var(--code); color: var(--codeink); font: 13px/1.5 ui-monospace, Menlo, monospace; tab-size: 4; white-space: pre; overflow: auto; }
-  #code[readonly] { opacity: .85; }
-  :root[data-theme="contrast"] #code[readonly] { opacity: 1; }
-  :root[data-theme="contrast"] #blocklyDiv .blocklyTreeSelected { outline: 2px solid var(--accent); outline-offset: -2px; }
-  #log { height: 30%; min-height: 90px; margin: 0; padding: 8px 12px; overflow: auto; background: var(--panel); border-top: 1px solid var(--line); font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; }
-  #log .err { color: var(--bad); } #log .okk { color: var(--good); }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #blocks { border-right: 0; border-bottom: 1px solid var(--line); } }
-</style>
+<script src="/preferences.js"></script>
+<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <header>
-  <h1>IQ Raw</h1>
-  <label id="themeSwitch" for="theme">Theme <select id="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="contrast">High Contrast</option></select></label>
-  <label>Language <select id="lang"><option value="python">Python</option><option value="cpp">C++</option></select></label>
-  <label>Slot <select id="slot"></select></label>
-  <label>Name <input type="text" id="name" maxlength="32" value="iq-raw"></label>
-  <button id="send" class="primary" title="Send the code to the slot and run it">Download and run</button>
-  <button id="sendOnly" title="Send the code to the slot without running it">Download</button>
-  <button id="run" title="Run the program already in this slot">Run slot</button>
-  <button id="stop">Stop</button>
-  <button id="build" title="Compile the C++ and show any errors, without sending it" hidden>Build only</button>
-  <button id="vm" title="Put the Python VM on the brain. Needed once, and again after a VEXos update.">Install Python VM</button>
-  <span class="spacer"></span>
-  <span id="brain">Brain: checking...</span>
-  <button id="refresh">Check brain</button>
+  <div class="appbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">IQ</span><div><h1>IQ Raw</h1><p>Your robot. Your code.</p></div></div>
+    <a class="button-link" href="/settings.html">Settings</a>
+  </div>
+  <div class="toolbar" aria-label="Program controls">
+    <div class="control-group">
+      <label>Language <select id="lang"><option value="python">Python</option><option value="cpp">C++</option></select></label>
+      <label>Slot <select id="slot"></select></label>
+      <label>Name <input type="text" id="name" maxlength="32" value="iq-raw"></label>
+    </div>
+    <div class="control-group">
+      <button id="send" class="primary" title="Send the code to the slot and run it">Download and run</button>
+      <button id="sendOnly" title="Send the code without starting it">Download</button>
+      <button id="run" title="Run the program already in this slot">Run slot</button>
+      <button id="stop">Stop</button>
+      <button id="build" title="Compile without sending to the brain" hidden>Build only</button>
+    </div>
+    <div class="control-group">
+      <button id="vm" title="Install once per brain, and again after a VEXos update">Install Python VM</button>
+    </div>
+  </div>
 </header>
+<div class="connection"><span id="brain" role="status">Brain: checking...</span><button id="refresh">Check brain</button></div>
 <main>
-  <section id="blocks"><div id="blocklyDiv"></div></section>
-  <aside>
+  <section id="blocks" class="editor-panel" aria-labelledby="blocksHeading">
+    <div class="panel-heading"><h2 id="blocksHeading">Block workspace</h2><span>Build something that moves</span></div>
+    <div id="blocklyDiv"></div>
+    <div class="panel-foot">Start with Events → when started · Scroll to zoom · Drag to explore</div>
+  </section>
+  <aside class="editor-panel" aria-labelledby="codeHeading">
+    <div class="panel-heading"><h2 id="codeHeading">Your code</h2><span id="codeMode">Synced with blocks</span></div>
     <div class="bar">
       <label><input type="checkbox" id="manual"> Edit code by hand</label>
       <span class="spacer"></span>
       <button id="open">Open .py</button>
       <button id="save">Save .py</button>
       <button id="programs">Programs on brain</button>
-      <button id="probe" title="Run a tiny program that prints what the brain's Python offers (pins, devices)">Probe brain API</button>
+      <button id="probe" title="Run a test program to inspect the brain's Python API">Probe brain API</button>
       <input type="file" id="file" accept=".py,.cpp,text/x-python,text/plain" hidden>
     </div>
-    <textarea id="code" spellcheck="false" readonly></textarea>
-    <pre id="log"></pre>
+    <textarea id="code" aria-label="Program source code" spellcheck="false" readonly></textarea>
+    <div class="panel-heading console-heading"><h2>Console</h2><span>Build &amp; device output</span></div>
+    <pre id="log" aria-label="Tool output"></pre>
   </aside>
 </main>
 <script src="/vendor/blockly/blockly_compressed.js"></script>
@@ -111,7 +84,7 @@
     if (!r.ok) throw new Error(j.error || r.statusText);
     return j;
   };
-  const busy = (on) => document.querySelectorAll('header button').forEach((b) => (b.disabled = on));
+  const busy = (on) => document.querySelectorAll('header button, #refresh').forEach((b) => (b.disabled = on));
   async function action(label, path, body) {
     busy(true); log('> ' + label);
     try {
@@ -130,7 +103,7 @@
   $('name').onchange = () => store.set('name', $('name').value);
 
   // ---- blocks and code ----
-  // CSS variables keep Blockly in sync with the app's system colour scheme.
+  // CSS variables keep Blockly in sync with the selected app theme.
   const theme = Blockly.Theme.defineTheme('iqraw', {
     base: Blockly.Themes.Classic,
     componentStyles: {
@@ -144,6 +117,7 @@
     },
   });
   const ws = Blockly.inject('blocklyDiv', { theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
+  new ResizeObserver(() => Blockly.svgResize(ws)).observe($('blocklyDiv'));
   const code = $('code');
   let manual = store.get('manual', '0') === '1';
   const generate = () => (lang === 'cpp' ? Blockly.Cpp : Blockly.Python).workspaceToCode(ws);
@@ -151,6 +125,7 @@
   function applyMode() {
     $('manual').checked = manual;
     code.readOnly = !manual;
+    $('codeMode').textContent = manual ? 'Editing by hand' : 'Synced with blocks';
   }
   function refreshFromBlocks() {
     if (manual) return;
