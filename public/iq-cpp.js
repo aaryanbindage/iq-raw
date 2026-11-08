@@ -17,6 +17,8 @@
     this.definitions_ = Object.create(null); // global lines, in the order first needed
     this.loopCount_ = 0;
     this.variables_ = new Set();
+    this.protos_ = []; // function prototypes, so functions can call each other in any order
+    this.setup_ = []; // lines that run once at the start of main (event registrations and the like)
     this.isInitialized = true;
   };
 
@@ -25,9 +27,20 @@
     return code + (next && !opt_thisOnly ? cpp.blockToCode(next) : '');
   };
 
+  // Blocks that only exist for Python (lists, for example) leave a comment instead of stopping the whole program.
+  const generateBlock = cpp.blockToCode.bind(cpp);
+  cpp.blockToCode = function (block, opt_thisOnly) {
+    if (block && !this.forBlock[block.type]) {
+      if (block.outputConnection) return ['0 /* ' + block.type + ' is not supported in C++ mode */', this.ORDER_ATOMIC];
+      return this.scrub_(block, '// ' + block.type + ' is not supported in C++ mode\n', opt_thisOnly);
+    }
+    return generateBlock(block, opt_thisOnly);
+  };
+
   cpp.finish = function (code) {
     const defs = Object.values(this.definitions_).join('\n');
-    const vars = [...this.variables_].map((v) => `${this.INDENT}double ${v} = 0;\n`).join('');
+    const globals = [...this.variables_].map((v) => `double ${v} = 0;`).join('\n');
+    const setup = this.setup_.map((l) => this.INDENT + l + '\n').join('');
     this.isInitialized = false;
     return [
       '#include "vex.h"',
@@ -37,10 +50,12 @@
       'using namespace vex;',
       '',
       'vex::brain Brain;',
+      globals,
+      this.protos_.join('\n'),
       defs,
       '',
       'int main() {',
-      vars + this.prefixLines(code.replace(/\n+$/, ''), this.INDENT) + '\n',
+      setup + this.prefixLines(code.replace(/\n+$/, ''), this.INDENT) + '\n',
       `${this.INDENT}while (true) {`,
       `${this.INDENT}${this.INDENT}this_thread::sleep_for(10);`,
       `${this.INDENT}}`,
@@ -115,6 +130,33 @@
   F.variables_set = (b, g) => `${varName(g, b)} = ${val(g, b, 'VALUE', '0')};\n`;
   F.text = (b, g) => [JSON.stringify(b.getFieldValue('TEXT')), g.ORDER_ATOMIC];
   F.text_join = (b, g) => ['"(text join is not supported in C++ mode)"', g.ORDER_ATOMIC];
+
+  F.controls_for = (b, g) => {
+    const v = varName(g, b);
+    const to = val(g, b, 'TO', '0'), by = val(g, b, 'BY', '1');
+    return `for (${v} = ${val(g, b, 'FROM', '0')}; (${by}) > 0 ? ${v} <= ${to} : ${v} >= ${to}; ${v} += ${by}) {\n${body(g, b, 'DO')}}\n`;
+  };
+
+  // ---- functions (Blockly's procedure blocks): numbers in, optional number out ----
+  const fnName = (name) => 'f_' + String(name).replace(/[^A-Za-z0-9_]/g, '_');
+  const params = (b) => b.getVars().map((v) => 'double v_' + String(v).replace(/[^A-Za-z0-9_]/g, '_')).join(', ');
+  const callArgs = (g, b) => (b.arguments_ || []).map((_, i) => val(g, b, 'ARG' + i, '0')).join(', ');
+  F.procedures_defnoreturn = (b, g) => {
+    const name = fnName(b.getFieldValue('NAME'));
+    const code = g.statementToCode(b, 'STACK');
+    g.protos_.push(`void ${name}(${params(b)});`);
+    g.definitions_['fn_' + name] = `void ${name}(${params(b)}) {\n${code}}`;
+    return null;
+  };
+  F.procedures_defreturn = (b, g) => {
+    const name = fnName(b.getFieldValue('NAME'));
+    const code = g.statementToCode(b, 'STACK');
+    g.protos_.push(`double ${name}(${params(b)});`);
+    g.definitions_['fn_' + name] = `double ${name}(${params(b)}) {\n${code}${g.INDENT}return ${val(g, b, 'RETURN', '0')};\n}`;
+    return null;
+  };
+  F.procedures_callnoreturn = (b, g) => `${fnName(b.getFieldValue('NAME'))}(${callArgs(g, b)});\n`;
+  F.procedures_callreturn = (b, g) => [`${fnName(b.getFieldValue('NAME'))}(${callArgs(g, b)})`, g.ORDER_ATOMIC];
 
   // ---- IQ blocks ----
   F.iq_when_started = () => '// When started\n';

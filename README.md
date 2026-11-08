@@ -53,14 +53,23 @@ Start a program with **Events → when started**, then attach blocks underneath 
 
 | Category | What it does |
 |---|---|
-| Events | A “when started” entry block for Python and C++. |
+| Events | "When started", plus a stack that runs when a brain button, bumper, touch LED, controller axis or button, or optical gesture or object event happens, or when a named event you broadcast arrives. |
 | Brain | Print to the brain screen, clear it, move the cursor, wait. |
-| Motors | Set a motor up (port, reversed), spin it at a percent, spin it a number of degrees, stop it. |
+| Motors | Spin (with or without a speed, for a distance, or to a position), stop, set velocity, stopping mode, timeout, torque and position, and read position, velocity, current, done and spinning. |
 | Ports | Raw volts to a motor, Touch LED colour, bumper and distance reads, and "port N device, call anything". |
 | Pins (C++) | Write high or low to one of the 12 ports' prongs, plus pin enable, write, read, digital and analog reads. C++ only. |
 | Controller | Joystick axes A to D and the eight buttons. |
-| Loops, Logic, Math, Text, Variables | The usual building blocks. |
+| Loops | While, repeat, for, break, wait until, wait with units, and start a thread. |
+| Logic, Math, Text, Variables | The usual building blocks. |
+| Drivetrain | A setup block (motor ports, wheel size, brain gyro), then drive, drive for a distance, turn, turn for, turn to heading or rotation, velocities, stopping, timeout, and reads for heading, rotation, velocity, current, done and moving. |
+| Looks | Draw pixels, lines, rectangles and circles, set pen and fill colour, pen width and font, next row, clear row, console print and clear, colour sensor light, touch LED brightness and fade. |
+| Sound | Play a note or one of the built-in sounds. |
+| Sensing | Brain (battery, button, cursor, timer), touch LED, colour sensor, distance sensor, gyro, inertial and optical sensor blocks. |
+| Functions | Your own functions, with number inputs and an optional number result. |
+| Lists (Python) | List blocks. They exist only in Python mode; in C++ mode they leave a comment. |
 | Raw Python | A raw statement, a raw value, a raw `if`, a raw `while`, and a bitwise AND, OR, XOR and shift. The text you type is copied as it is, so in C++ mode it must be C++. |
+
+These cover the blocks documented for VEXcode IQ (2nd gen). Left out: the vision sensor and GPS blocks (they need a configured sensor), and the "monitor" blocks (a VEXcode window feature). Use the raw blocks for those.
 
 ## How it works
 
@@ -89,7 +98,8 @@ Start a program with **Events → when started**, then attach blocks underneath 
 - `public/index.html` : the editor page and its buttons.
 - `public/iq-blocks.js` : block definitions, the Python generator, the toolbox.
 - `public/iq-cpp.js` : the C++ generator.
-- `test/blocks.test.mjs` : checks the generators and the server's guards, and compiles a pin program with VEX's compiler. Run it with `npm test`.
+- `public/iq-catalog.js` : the table of most IQ blocks (label, Python and C++ for each); both generators are built from it.
+- `test/blocks.test.mjs`, `test/catalog.test.mjs` : check the generators and the server's guards, compile a pin program, and build every catalog block in both languages (the Python must parse and the C++ must compile with VEX's compiler, with every dropdown option). Run them with `npm test`.
 
 ## Testing with a real brain
 
@@ -100,7 +110,7 @@ Nothing here has run on hardware yet. For someone with an IQ (2nd gen) brain:
 3. C++: press **Build only**, then **Download and run**. Try the "write high to prong of port N" block with a multimeter or an LED on that port.
 4. Report what the options and pin numbers need to be, and anything that errors, with the text from the log box.
 
-Unverified from memory: Python `spin(..., VOLT)`, `Touchled.set_color(Color.X)` and `Distance.object_distance(MM)`. The C++ names were checked against the SDK headers.
+Not checked on a brain: the Python for every block. It follows VEX's block docs and parses, but no Python interpreter ran it. A few Python names are from memory because the docs don't show them: the `ColorSensor` and `Gyro` constructors, and `SmartDrive` with a wheel size. The C++ is checked by compiling against VEX's SDK headers.
 
 ## Limits
 
