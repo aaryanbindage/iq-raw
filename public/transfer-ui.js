@@ -4,20 +4,25 @@
     try{const p=JSON.parse(line);return !(p.phase==='program'&&p.action==='download'&&typeof p.percent==='number');}catch{return true;}
   }).join('\n');}
   async function transfer(body,buildOnly=false){
-    const panel=$('transferProgress'),bar=$('transferBar'),label=$('transferLabel'),percent=$('transferPercent'),dismiss=$('transferDismiss');
+    const root=$('log'),bar=document.createElement('span');
+    bar.className='transfer-progress';bar.setAttribute('role','progressbar');
+    bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax','100');
     let last=null,phase=buildOnly||body.lang==='cpp'?'build':'prepare',result;
-    panel.hidden=false;panel.classList.remove('failed','complete');dismiss.disabled=true;
     document.dispatchEvent(new Event('iqraw-transfer-start'));
-    dismiss.onclick=()=>{panel.hidden=true;};
+    const show=message=>{
+      const filled=last===null?0:Math.floor(last*40/100);
+      bar.textContent=`${message} [${'█'.repeat(filled)}${'░'.repeat(40-filled)}] ${last===null?'…':Math.floor(last)+'%'}\n`;
+      bar.setAttribute('aria-label',message);
+      bar.setAttribute('aria-valuetext',message+(last===null?'':` ${Math.floor(last)}%`));
+      if(!root.contains(bar))root.append(bar);
+      root.scrollTop=root.scrollHeight;
+    };
     const paint=event=>{
       phase=event.phase;
       last=typeof event.percent==='number'&&Number.isFinite(event.percent)?Math.max(0,Math.min(100,event.percent)):null;
-      const filled=last===null?0:Math.floor(last*40/100);
-      bar.textContent='['+'█'.repeat(filled)+'░'.repeat(40-filled)+']';
       bar.classList.toggle('indeterminate',last===null);
       if(last===null)bar.removeAttribute('aria-valuenow');else bar.setAttribute('aria-valuenow',String(last));
-      percent.textContent=last===null?'':`${Math.floor(last)}%`;
-      label.textContent=({build:`${buildOnly?'':'1/2 · '}Building C++…`,console:'Connecting console before startup…',prepare:'Preparing download…',download:`${body.lang==='cpp'?'2/2 · ':''}Downloading to slot ${body.slot}…`})[phase]||'Downloading…';
+      show(({build:`${buildOnly?'':'1/2 · '}Building C++…`,console:'Connecting console before startup…',prepare:'Preparing download…',download:`${body.lang==='cpp'?'2/2 · ':''}Downloading to slot ${body.slot}…`})[phase]||'Downloading…');
     };
     paint({phase,percent:null});
     try{
@@ -37,11 +42,11 @@
         if(done){if(pending)consume(pending);break;}
       }
       if(!result)throw Error('The connection ended before the download result arrived. Check the console and brain before retrying.');
-      if(result.ok){paint({phase:buildOnly?'build':'download',percent:100});label.textContent=(buildOnly?'Build complete':body.run?'Download and run complete':'Download complete')+(result.warning?' · console unavailable':'');panel.classList.add('complete');}
-      else{label.textContent=phase==='build'?'Build failed':'Download failed';panel.classList.add('failed');}
+      if(result.ok){paint({phase:buildOnly?'build':'download',percent:100});show((buildOnly?'Build complete':body.run?'Download and run complete':'Download complete')+(result.warning?' · console unavailable':''));bar.classList.add('complete');}
+      else{show(phase==='build'?'Build failed':'Download failed');bar.classList.add('failed');}
       return result;
-    }catch(error){label.textContent=buildOnly?'Build interrupted':'Download interrupted';panel.classList.add('failed');throw error;}
-    finally{dismiss.disabled=false;bar.classList.remove('indeterminate');}
+    }catch(error){show(buildOnly?'Build interrupted':'Download interrupted');bar.classList.add('failed');throw error;}
+    finally{bar.classList.remove('indeterminate');}
   }
   window.IQTransfer={download:body=>transfer(body),build:body=>transfer(body,true),withoutProgress};
 })();

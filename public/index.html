@@ -62,10 +62,6 @@
     </section>
     <section id="consolePanel" aria-labelledby="consoleHeading">
       <div class="panel-heading console-heading"><h2 id="consoleHeading">Console</h2><span id="consoleStatus">Tool output · brain disconnected</span><div class="console-actions"><button id="consoleConnect" type="button">Connect brain</button><button id="consoleClear" type="button">Clear</button><button id="consoleCopy" type="button">Copy</button></div></div>
-      <section id="transferProgress" class="transfer-progress" aria-label="Build and download progress" hidden>
-        <div class="transfer-heading"><span id="transferLabel" role="status">Preparing download…</span><span id="transferPercent"></span><button id="transferDismiss" type="button" aria-label="Dismiss transfer progress">×</button></div>
-        <pre id="transferBar" role="progressbar" aria-label="Build and download progress" aria-valuemin="0" aria-valuemax="100"></pre>
-      </section>
       <dl id="liveMonitors" aria-label="Live value monitors" hidden></dl>
       <pre id="log" aria-label="Console output" tabindex="0"></pre>
       <form id="consoleForm"><label class="sr-only" for="consoleInput">Send a line to the brain</label><input id="consoleInput" type="text" placeholder="Send a line to the brain…" autocomplete="off" disabled><button id="consoleSend" type="submit" disabled>Send</button></form>

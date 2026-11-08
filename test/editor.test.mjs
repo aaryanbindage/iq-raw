@@ -58,7 +58,6 @@ try{
   $('consoleToggle').click();assert.equal($('consolePanel').hidden,true);
   w.document.dispatchEvent(new w.Event('iqraw-transfer-start'));
   assert.equal($('consolePanel').hidden,false,'Starting a transfer must reveal its console progress');
-  assert.equal($('transferProgress').closest('#consolePanel'),$('consolePanel'));
   await w.document.exitFullscreen();
   assert.equal(w.document.body.classList.contains('focus-mode'),false);
   assert.equal($('sourcePanel').hidden,false);assert.equal($('consolePanel').hidden,false);
