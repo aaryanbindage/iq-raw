@@ -185,10 +185,13 @@
     try {
       const j = await api('info');
       if (j.ok) {
-        // vexcom --json nests the details under "brain"; versions are hex numbers like 0x01000900 meaning 1.0.9.0
-        const b = (j.info && j.info.brain) || j.info || {};
+        // IQ2 status nests brain and battery details under iq2.
+        const info = j.info || {};
+        const device = info.iq2 || info;
+        const b = device.brain || device;
+        const battery = device.system?.battery ?? b.battery;
         const ver = (v) => { const n = parseInt(v, 16); return Number.isNaN(n) ? '' : [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.'); };
-        const bits = [typeof b.name === 'string' && b.name, typeof b.vexos === 'string' && ver(b.vexos) && 'VEXos ' + ver(b.vexos), Number.isFinite(Number(b.battery)) && b.battery !== undefined && 'battery ' + b.battery + '%'].filter(Boolean);
+        const bits = [typeof b.name === 'string' && b.name, typeof b.vexos === 'string' && ver(b.vexos) && 'VEXos ' + ver(b.vexos), Number.isFinite(Number(battery)) && battery != null && 'battery ' + battery + '%'].filter(Boolean);
         el.textContent = 'Brain: connected' + (bits.length ? ' (' + bits.join(', ') + ')' : '');
         el.className = 'ok';
       } else { el.textContent = 'Brain: not found. Plug it in by USB and turn it on.'; el.className = 'bad'; log(j.out.trim(), 'err'); }

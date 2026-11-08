@@ -23,6 +23,10 @@ You need [Homebrew](https://brew.sh) for the first line. If you already have Nod
 
 On Apple Silicon Macs, VEX's `vexcom` is an Intel program, so macOS may ask to install Rosetta the first time.
 
+For C++ builds, wait for the toolchain download and extraction to finish. If it was interrupted, run VEX's **Download Toolchain** command in VS Code again. iq-raw supports both `toolchain_osxarm64` and `toolchain_osx64`, and also checks `~/.iq-raw/toolchains` for a local installation. A ZIP file alone is not an installed toolchain.
+
+Before downloading to a brain, disconnect it in VEXcode IQ or save and quit VEXcode IQ. Another app holding the brain's USB ports open can interfere with transfers even when **Check brain** succeeds.
+
 To run it again later: `cd iq-raw && npm start`. To stop it: Ctrl+C in that Terminal window.
 
 ## How to use it

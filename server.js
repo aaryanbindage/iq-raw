@@ -84,10 +84,10 @@ function run(bin, args, { timeoutMs = 30000, cwd, env } = {}) {
 // Exit meanings from VEX's extension. Some failures print only the version banner.
 const VEX_ERRORS = {
   1: 'operation failed; no specific cause reported',
-  2: 'brain communication failed',
+  2: 'brain communication failed; disconnect the brain in VEXcode IQ or quit VEXcode, then reconnect USB',
   3: 'version error',
   4: 'command error',
-  5: 'device not found',
+  5: 'device not found; connect the powered-on brain directly by USB',
   6: 'serial port error; close other VEX apps and check the USB connection',
   7: 'invalid command parameter',
   8: 'VEXos error',
@@ -105,10 +105,14 @@ const vexcom = async (args, timeoutMs = 30000) => {
 const STORAGE = process.env.VEX_STORAGE || path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'vexrobotics.vexcode');
 function findCpp() {
   const sdkRoot = path.join(STORAGE, 'sdk', 'cpp', 'IQ2');
-  const tools = path.join(STORAGE, 'tools', 'cpp', 'toolchain_osx64');
+  const toolchainNames = process.arch === 'arm64' ? ['toolchain_osxarm64', 'toolchain_osx64'] : ['toolchain_osx64'];
+  const toolRoots = [path.join(STORAGE, 'tools', 'cpp'), path.join(os.homedir(), '.iq-raw', 'toolchains')];
+  const tools = toolchainNames.flatMap((name) => toolRoots.map((root) => path.join(root, name)))
+    .find((root) => ['clang/bin/clang', 'gcc/bin/arm-none-eabi-ld', 'gcc/bin/arm-none-eabi-objcopy', 'gcc/bin/arm-none-eabi-ar', 'gcc/bin/arm-none-eabi-size', 'tools/bin/make']
+      .every((file) => { try { fs.accessSync(path.join(root, file), fs.constants.X_OK); return true; } catch { return false; } }));
   let sdks = [];
-  try { sdks = fs.readdirSync(sdkRoot).filter((d) => fs.existsSync(path.join(sdkRoot, d, 'vexiq2', 'libviq2rt.a'))).sort(); } catch { /* none */ }
-  if (!sdks.length || !fs.existsSync(path.join(tools, 'clang', 'bin', 'clang'))) return null;
+  try { sdks = fs.readdirSync(sdkRoot).filter((d) => fs.existsSync(path.join(sdkRoot, d, 'vexiq2', 'libviq2rt.a'))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })); } catch { /* none */ }
+  if (!sdks.length || !tools) return null;
   const extRoot = path.join(os.homedir(), '.vscode', 'extensions');
   let zip = null;
   try {
@@ -125,7 +129,7 @@ function findCpp() {
 // Compile main.cpp into a .bin using the stock IQ2 project template and its makefile. Returns { ok, out, dir, bin }; the caller removes dir.
 async function buildCpp(code) {
   const cpp = findCpp();
-  if (!cpp) return { ok: false, out: 'The VEX IQ2 C++ tools were not found. In VS Code, open the VEX extension and create an IQ (2nd gen) C++ project once so it downloads the SDK.' };
+  if (!cpp) return { ok: false, out: 'The VEX IQ2 C++ tools were not found or their installation is incomplete. In VS Code, create an IQ (2nd gen) C++ project, then run VEX’s "Download Toolchain" command from the Command Palette and wait for it to finish. A ZIP file alone is not an installed compiler. Apple Silicon and Intel Mac toolchains are supported.' };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iq-raw-cpp-'));
   const unzip = await run('/usr/bin/unzip', ['-qo', cpp.zip, '-d', dir], { cwd: dir });
   if (unzip.code !== 0) return { ok: false, out: unzip.out, dir };
