@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IQ Raw</title>
+<script src="/theme.js"></script>
 <style>
-  :root { --bg:#f6f7f9; --panel:#fff; --ink:#1c2230; --muted:#5d6678; --line:#d5d9e2; --accent:#1f6feb; --bad:#b42318; --good:#1a7f37; --code:#0f1420; --codeink:#e6e9f0; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --panel:#1b1f29; --ink:#e6e9f0; --muted:#98a1b3; --line:#2f3646; --accent:#5b9cff; --bad:#ff7b72; --good:#56d364; --code:#0b0e14; } }
+  :root { color-scheme: light; --bg:#f6f7f9; --panel:#fff; --ink:#1c2230; --muted:#5d6678; --line:#d5d9e2; --accent:#1f6feb; --accentink:#fff; --bad:#b42318; --good:#1a7f37; --code:#0f1420; --codeink:#e6e9f0; }
+  :root[data-theme="dark"] { color-scheme: dark; --bg:#12151c; --panel:#1b1f29; --ink:#e6e9f0; --muted:#98a1b3; --line:#2f3646; --accent:#5b9cff; --accentink:#101722; --bad:#ff7b72; --good:#56d364; --code:#0b0e14; }
+  :root[data-theme="midnight"] { color-scheme: dark; --bg:#0b1024; --panel:#141d38; --ink:#eef2ff; --muted:#b1bddb; --line:#35436c; --accent:#b5a1ff; --accentink:#18102e; --bad:#ff9baf; --good:#67e8c3; --code:#080d1d; --codeink:#eef2ff; }
+  :root[data-theme="contrast"] { color-scheme: dark; --bg:#000; --panel:#000; --ink:#fff; --muted:#eee; --line:#777; --accent:#ffeb3b; --accentink:#000; --bad:#ff9c9c; --good:#8dffad; --code:#000; --codeink:#fff; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; }
@@ -17,7 +20,9 @@
   input[type=text] { width: 130px; }
   button { cursor: pointer; }
   button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accentink); }
+  #themeSwitch { color: var(--ink); font-weight: 600; }
+  select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button:disabled { opacity: .5; cursor: default; }
   .spacer { flex: 1; }
   #brain { font-size: 13px; color: var(--muted); }
@@ -38,6 +43,8 @@
   .bar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
   #code { flex: 1; min-height: 0; width: 100%; resize: none; border: 0; outline: 0; padding: 10px 12px; background: var(--code); color: var(--codeink); font: 13px/1.5 ui-monospace, Menlo, monospace; tab-size: 4; white-space: pre; overflow: auto; }
   #code[readonly] { opacity: .85; }
+  :root[data-theme="contrast"] #code[readonly] { opacity: 1; }
+  :root[data-theme="contrast"] #blocklyDiv .blocklyTreeSelected { outline: 2px solid var(--accent); outline-offset: -2px; }
   #log { height: 30%; min-height: 90px; margin: 0; padding: 8px 12px; overflow: auto; background: var(--panel); border-top: 1px solid var(--line); font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; }
   #log .err { color: var(--bad); } #log .okk { color: var(--good); }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #blocks { border-right: 0; border-bottom: 1px solid var(--line); } }
@@ -46,6 +53,7 @@
 <body>
 <header>
   <h1>IQ Raw</h1>
+  <label id="themeSwitch" for="theme">Theme <select id="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="midnight">Midnight</option><option value="contrast">High Contrast</option></select></label>
   <label>Language <select id="lang"><option value="python">Python</option><option value="cpp">C++</option></select></label>
   <label>Slot <select id="slot"></select></label>
   <label>Name <input type="text" id="name" maxlength="32" value="iq-raw"></label>
