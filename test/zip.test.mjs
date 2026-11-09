@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { makeZip } from './tools.mjs';
 const require = createRequire(import.meta.url);
-const { extractZip } = require('../zip.js');
+const { extractZip, readZipEntry } = require('../zip.js');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iqraw-zip-'));
 try {
@@ -17,6 +17,9 @@ try {
   assert.equal(fs.readFileSync(path.join(out, 'src', 'main.cpp'), 'utf8'), 'int main() {}\n');
   assert.equal(fs.readFileSync(path.join(out, 'makefile'), 'utf8'), makefile);
   assert.equal(fs.readFileSync(path.join(out, 'include', 'vex.h'), 'utf8'), '#pragma once\n');
+  assert.equal(readZipEntry(good, 'include/vex.h').toString(), '#pragma once\n');
+  assert.equal(readZipEntry(good, 'makefile').toString(), makefile);
+  assert.equal(readZipEntry(good, 'missing.h'), null);
 
   const evil = path.join(dir, 'evil.zip');
   fs.writeFileSync(evil, makeZip([['../escaped.txt', 'nope']]));

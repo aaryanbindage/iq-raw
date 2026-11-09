@@ -1,10 +1,10 @@
 const { StringDecoder } = require('node:string_decoder');
 
 // Only VEXcom's discovered user port may be opened; HTTP callers cannot supply paths.
-// macOS names it /dev/tty.usbmodem…, Linux /dev/ttyACM…, Windows COM….
-const USER_PORT=/^(?:\/dev\/(?:tty|cu)\.usbmodem[\w.-]+|\/dev\/ttyACM\d+|COM\d+)$/;
+// macOS names the brain's ports /dev/tty.usbmodem…, Linux /dev/ttyACM…, Windows COM….
+const PORT_NAME=/^(?:\/dev\/(?:tty|cu)\.usbmodem[\w.-]+|\/dev\/ttyACM\d+|COM\d+)$/;
 function createConsole({ SerialPort, query }) {
-  let port=null, opening=null, history='',suspended=0,resume=false;
+  let port=null, opening=null, history='',suspended=0,resume=false,admin=null;
   const clients=new Set();
   const state=()=>({connected:!!port?.isOpen});
   const send=(event,data)=>{
@@ -20,8 +20,9 @@ function createConsole({ SerialPort, query }) {
       let info;
       try{info=JSON.parse(result.out.slice(result.out.indexOf('{')));}catch{throw Error(result.out||'The brain did not return its console port.');}
       const device=info.device;
-      if(result.code!==0||device?.connection!=='brain'||!USER_PORT.test(device?.user||'')) throw Error('No IQ brain console port found. Connect the powered-on brain directly by USB, and close VEXcode’s connection.');
+      if(result.code!==0||device?.connection!=='brain'||!PORT_NAME.test(device?.user||'')) throw Error('No IQ brain console port found. Connect the powered-on brain directly by USB, and close VEXcode’s connection.');
       const path=device.user.replace('/dev/tty.','/dev/cu.');
+      admin=PORT_NAME.test(device.admin||'')?device.admin:null;
       const current=new SerialPort({path,baudRate:115200,parity:'none',stopBits:1,xon:true,xoff:true,autoOpen:false});
       const decoder=new StringDecoder('utf8');port=current;
       current.on('data',bytes=>{
@@ -29,7 +30,7 @@ function createConsole({ SerialPort, query }) {
         history=(history+text).slice(-65536);send('data',text);
       });
       current.on('error',error=>send('console-error','Console: '+error.message));
-      current.on('close',()=>{if(port===current)port=null;send('state',state());});
+      current.on('close',()=>{if(port===current){port=null;admin=null;}send('state',state());});
       try{await new Promise((resolve,reject)=>current.open(error=>error?reject(error):resolve()));}
       catch(error){if(port===current)port=null;throw Error('Could not open the brain console: '+error.message);}
       send('state',state());return state();
@@ -66,6 +67,6 @@ function createConsole({ SerialPort, query }) {
     const heartbeat=setInterval(()=>res.write(': heartbeat\n\n'),15000);heartbeat.unref();
     res.on('close',()=>{clearInterval(heartbeat);clients.delete(res);});
   }
-  return {connect,disconnect,input,withSuspended,subscribe,state,clear(){history='';send('clear',null);},async close(){for(const c of clients)c.end();clients.clear();await disconnect();}};
+  return {connect,disconnect,input,withSuspended,subscribe,state,adminPort:()=>admin,clear(){history='';send('clear',null);},async close(){for(const c of clients)c.end();clients.clear();await disconnect();}};
 }
 module.exports={createConsole};

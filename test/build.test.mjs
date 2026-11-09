@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import zlib from 'node:zlib';
 import { makeZip } from './tools.mjs';
 
 const exe = process.platform === 'win32' ? '.exe' : '';
@@ -25,7 +26,11 @@ try {
   fs.mkdirSync(path.dirname(make), { recursive: true });
   try { fs.linkSync(process.execPath, make); } catch { fs.copyFileSync(process.execPath, make); }
   fs.mkdirSync(path.join(sdk, 'vexiq2'), { recursive: true });
-  fs.writeFileSync(path.join(sdk, 'vexiq2', 'libviq2rt.a'), '');
+  // The SDK files that scripts/pack-iq2-sdk.mjs bundles for the web compiler.
+  for (const file of ['libviq2rt.a', 'lscript.ld', 'license.pdf', 'include/v5_api.h', 'gcc/include/stdio.h', 'gcc/libs/libc_nano.a', 'gcc/libs/libstdc++_nano.a', 'gcc/libs/libm.a', 'gcc/libs/libgcc.a']) {
+    fs.mkdirSync(path.dirname(path.join(sdk, 'vexiq2', file)), { recursive: true });
+    fs.writeFileSync(path.join(sdk, 'vexiq2', file), file);
+  }
   const template = path.join(home, '.vscode', 'extensions', 'vexrobotics.vexcode-0.8.1', 'resources', 'templates', 'projects', 'IQ2', 'cpp_iq2_vsc_empty.zip');
   fs.mkdirSync(path.dirname(template), { recursive: true });
   fs.writeFileSync(template, makeZip([['makefile', 'all:\n', true], ['src/main.cpp', 'template\n'], ['include/vex.h', '#pragma once\n']]));
@@ -80,6 +85,16 @@ if (/^make/i.test(path.basename(process.execPath))) {
   assert.match(bad.out, /undeclared identifier 'nope'/);
   assert.ok(!fs.readdirSync(os.tmpdir()).some((d) => d.startsWith('iq-raw-cpp-') && fs.existsSync(path.join(os.tmpdir(), d, 'src', 'main.cpp')) && fs.readFileSync(path.join(os.tmpdir(), d, 'src', 'main.cpp'), 'utf8').includes('nope')), 'build folders should be removed');
   console.log(`ok - finds vexcom in ${platformDir}; C++ build finds the ${toolchain} toolchain, unpacks the template and runs make with VEX's PATH order`);
+
+  // The web compiler's SDK bundle is packed from the same install, with no unzip program.
+  const bundle = path.join(home, 'iq2-sdk.json.gz');
+  const pack = spawnSync(process.execPath, ['scripts/pack-iq2-sdk.mjs', bundle], { env: { ...process.env, HOME: home, USERPROFILE: home, VEX_STORAGE: storage }, encoding: 'utf8' });
+  assert.equal(pack.status, 0, pack.stderr);
+  const packed = JSON.parse(zlib.gunzipSync(fs.readFileSync(bundle)));
+  assert.equal(packed.version, 'V1_0_0');
+  assert.equal(Buffer.from(packed.files['include/vex.h'], 'base64').toString(), '#pragma once\n');
+  for (const key of ['sdk/libviq2rt.a', 'sdk/include/v5_api.h', 'sdk/gcc/include/stdio.h', 'sdk/gcc/libs/libgcc.a']) assert.ok(packed.files[key], key + ' should be packed');
+  console.log('ok - packs the web compiler SDK bundle from the VEX install on this OS');
 } finally {
   server?.kill();
   fs.rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

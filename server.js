@@ -18,14 +18,7 @@ const MAX_CODE = 200000;
 // its libusb, to our own folder. Looks in VS Code and the other editors that share its extension format.
 const EXE = process.platform === 'win32' ? 'vexcom.exe' : 'vexcom';
 const PLATFORM_DIR = process.platform === 'darwin' ? 'osx' : process.platform === 'win32' ? 'win32' : `linux-${{ x64: 'x64', arm64: 'arm64', arm: 'arm32' }[process.arch] || process.arch}`;
-const EXT_ROOTS = ['.vscode', '.vscode-insiders', '.vscode-oss', '.cursor', '.windsurf', '.vscode-server'].map((d) => path.join(os.homedir(), d, 'extensions'));
-// The extension keeps its downloads (vexcom, the C++ SDK and toolchain) in the editor's per-user storage folder, which
-// lives in a different place on each OS. VEX_STORAGE overrides the search.
-const USER_DATA = process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Application Support')
-  : process.platform === 'win32' ? process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
-  : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-const STORAGES = process.env.VEX_STORAGE ? [process.env.VEX_STORAGE]
-  : ['Code', 'Code - Insiders', 'VSCodium', 'Cursor', 'Windsurf'].map((app) => path.join(USER_DATA, app, 'User', 'globalStorage', 'vexrobotics.vexcode'));
+const { EXT_ROOTS, STORAGES, findSdk, findTemplate } = require('./vex-paths');
 // The extension downloads vexcom into its storage folder (tools/vexcom/<version>/<platform>) the first time it runs;
 // older versions bundled it inside the extension folder instead.
 const STORE_ROOTS = STORAGES.map((s) => path.join(s, 'tools', 'vexcom'));
@@ -68,7 +61,7 @@ const notFound = () => `vexcom was not found. Install the VS Code extension "VEX
 
 // ---- running tools, one command at a time (one USB device, and builds share the template) ----
 let queue = Promise.resolve();
-function run(bin, args, { timeoutMs = 30000, cwd, env } = {}) {
+function run(bin, args, { timeoutMs = 30000, cwd, env, onOutput } = {}) {
   const job = queue.then(() => new Promise((resolve) => {
     if (!bin) return resolve({ code: -1, out: notFound() });
     // A .js tool (VEXCOM=/path/to/fake.js) runs under this Node, since Windows cannot start a script from its shebang line.
@@ -76,8 +69,8 @@ function run(bin, args, { timeoutMs = 30000, cwd, env } = {}) {
     const p = spawn(exe, argv, { cwd: cwd || path.dirname(bin), env: env || process.env, windowsHide: true });
     let out = '';
     const timer = setTimeout(() => { out += '\n[timed out]'; p.kill(); }, timeoutMs);
-    p.stdout.on('data', (d) => (out += d));
-    p.stderr.on('data', (d) => (out += d));
+    p.stdout.on('data', (d) => {out += d;onOutput?.(d,'stdout');});
+    p.stderr.on('data', (d) => {out += d;onOutput?.(d,'stderr');});
     p.on('error', (e) => { clearTimeout(timer); resolve({ code: -1, out: String(e) }); });
     p.on('close', (code, signal) => {
       clearTimeout(timer);
@@ -98,8 +91,11 @@ const VEX_ERRORS = {
   7: 'invalid command parameter',
   8: 'VEXos error',
 };
-const vexcom = async (args, timeoutMs = 30000) => {
-  const r = await run(findVexcom(), args, { timeoutMs });
+const vexcom = async (args, timeoutMs = 30000, onProgress) => {
+  const parser=require('./transfer-progress').progressParser;
+  const streams=onProgress?{stdout:parser(onProgress),stderr:parser(onProgress)}:null;
+  const r = await run(findVexcom(), args, { timeoutMs,onOutput:streams?(data,stream)=>streams[stream].write(data):undefined });
+  if(streams){streams.stdout.end();streams.stderr.end();}
   if (r.code !== 0) {
     const detail = r.signal ? `terminated by ${r.signal}` : `exited with code ${r.code} (${VEX_ERRORS[r.code] || 'tool could not complete the command'})`;
     r.out = `${r.out.trim()}\n\nvexcom ${detail}.`.trim();
@@ -155,21 +151,9 @@ function findCpp() {
   const tools = TOOLCHAINS.flatMap((name) => toolRoots.map((root) => path.join(root, name)))
     .find((root) => ['clang/bin/clang', 'gcc/bin/arm-none-eabi-ld', 'gcc/bin/arm-none-eabi-objcopy', 'gcc/bin/arm-none-eabi-ar', 'gcc/bin/arm-none-eabi-size', 'tools/bin/make']
       .every((file) => isTool(path.join(root, file))));
-  let sdk = null;
-  for (const storage of STORAGES) {
-    const sdkRoot = path.join(storage, 'sdk', 'cpp', 'IQ2');
-    let sdks = [];
-    try { sdks = fs.readdirSync(sdkRoot).filter((d) => fs.existsSync(path.join(sdkRoot, d, 'vexiq2', 'libviq2rt.a'))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })); } catch { continue; /* none */ }
-    if (sdks.length) { sdk = path.join(sdkRoot, sdks[sdks.length - 1]); break; }
-  }
+  const sdk = findSdk();
   if (!sdk || !tools) return null;
-  let zip = null;
-  for (const extRoot of EXT_ROOTS) {
-    let dirs = [];
-    try { dirs = fs.readdirSync(extRoot).filter((d) => /^vexrobotics\.vexcode-/i.test(d)).sort((a, b) => b.localeCompare(a, undefined, { numeric: true })); } catch { continue; /* editor not installed */ }
-    zip = dirs.map((d) => path.join(extRoot, d, 'resources', 'templates', 'projects', 'IQ2', 'cpp_iq2_vsc_empty.zip')).find((z) => fs.existsSync(z));
-    if (zip) break;
-  }
+  const zip = findTemplate();
   if (!zip) return null;
   // Same search order as VEX's extension: the SDK, then gcc, clang, make's own folder, then the user's PATH.
   const pathDirs = [sdk, ...['gcc/bin', 'clang/bin', 'tools/bin'].map((d) => path.join(tools, d))];
@@ -193,10 +177,16 @@ async function buildCpp(code) {
 const cleanSlot = (s) => (Number.isInteger(s) && s >= 1 && s <= 8 ? s : null);
 const cleanName = (n) => (typeof n === 'string' && /^[\w .-]{1,32}$/.test(n.trim()) ? n.trim() : 'iq-raw');
 
-async function download({ code, slot, name, run: runAfter, lang = 'python', timeoutMs = 120000 }) {
+async function prepareConsole(){
+  try{await brainConsole.connect();return '';}
+  catch(error){return '\nConsole connection failed: '+error.message+'\nProgram output may be missed until the console is connected.';}
+}
+
+async function download({ code, slot, name, run: runAfter, lang = 'python', timeoutMs = 120000, onProgress=()=>{} }) {
   let dir = null;
   try {
     let file;
+    onProgress({phase:lang==='cpp'?'build':'prepare',percent:null});
     if (lang === 'cpp') {
       const b = await buildCpp(code);
       dir = b.dir || null;
@@ -210,16 +200,27 @@ async function download({ code, slot, name, run: runAfter, lang = 'python', time
     // Match VEX's extension, including structured error output. Be verbose on
     // the first attempt rather than repeating a possibly partially completed transfer.
     const base = ['--slot', String(slot), '--write', file, '--json', '--progress', '--verbose'];
-    if (runAfter) base.push('--run');
-    const r = await brainConsole.withSuspended(async()=>{
-      let result=await vexcom(['--name', name, ...base], timeoutMs);
+    let warning='';
+    if (runAfter){
+      onProgress({phase:'console',percent:null});
+      warning=await prepareConsole();
+      base.push('--run');
+    }
+    // IQ2 USB has separate admin and user ports. Keep the terminal listening before
+    // startup, and explicitly direct VEXcom commands to the discovered admin port.
+    const admin=brainConsole.adminPort();if(admin)base.push(admin);
+    onProgress({phase:'download',percent:null});
+    const r = await (async()=>{
+      let result=await vexcom(['--name', name, ...base], timeoutMs,onProgress);
       // Retry only an explicitly unsupported option, never an interrupted transfer.
       const transferStarted=/"(?:phase|action)"\s*:\s*"(?:program|download)"/.test(result.out);
-      if(result.code!==0&&!transferStarted&&/unknown|unrecognized|invalid option|usage/i.test(result.out))result=await vexcom(base,timeoutMs);
+      if(result.code!==0&&!transferStarted&&/unknown|unrecognized|invalid option|usage/i.test(result.out))result=await vexcom(base,timeoutMs,onProgress);
       if(result.code===3)result.out+='\n'+await versionDiagnostics(lang);
       if(result.code!==0&&[2,3,4,5,6].includes(result.code))result.out+='\n'+await portDiagnostics();
       return result;
-    });
+    })();
+    r.out+=warning;
+    r.warning=warning;
     if (r.code === 1 && lang !== 'cpp') r.out += '\n\nFor Python, also check that the Python VM has been installed on this brain using "Install Python VM".';
     return r;
   } finally {
@@ -237,14 +238,27 @@ brain.screen.print("probe done")
 `;
 
 // ---- HTTP ----
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.mjs': 'text/javascript; charset=utf-8', '.md': 'text/markdown; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.mjs': 'text/javascript; charset=utf-8', '.wasm':'application/wasm', '.json':'application/json', '.py':'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8' };
 
-function sendFile(res, file) {
+// Cross-origin isolation lets the Python preview worker sleep and read the brain buttons through shared memory.
+// Everything the page loads is same-origin, so nothing breaks.
+const ISOLATION = { 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' };
+
+function sendFile(res, file, cache = 'no-store') {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404).end('Not found'); return; }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': cache, ...ISOLATION });
     res.end(data);
   });
+}
+
+async function streamOperation(res,action){
+  res.writeHead(200,{'content-type':'application/x-ndjson','cache-control':'no-store','x-content-type-options':'nosniff'});
+  res.flushHeaders();
+  const emit=event=>{if(!res.destroyed&&!res.writableEnded)res.write(JSON.stringify(event)+'\n');};
+  try{emit({type:'result',...await action(progress=>emit({type:'progress',...progress}))});}
+  catch(error){emit({type:'result',ok:false,out:String(error.message||error)});}
+  res.end();
 }
 
 function inside(base, p) {
@@ -288,6 +302,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method !== 'POST') return json(405, { error: 'POST only' });
       const body = await readJson(req);
+      if(url.pathname==='/api/preview/compile')return json(200,await require('./preview/compiler').compile(body.code));
       if(url.pathname==='/api/console/connect') return json(200,{ok:true,...await brainConsole.connect()});
       if(url.pathname==='/api/console/disconnect') return json(200,{ok:true,...await brainConsole.disconnect()});
       if(url.pathname==='/api/console/input'){await brainConsole.input(body.text);return json(200,{ok:true});}
@@ -296,14 +311,28 @@ const server = http.createServer(async (req, res) => {
         const slot = cleanSlot(body.slot);
         if (!slot) return json(400, { error: 'Slot must be 1 to 8.' });
         if (typeof body.code !== 'string' || !body.code.trim() || body.code.length > MAX_CODE) return json(400, { error: 'No code to send (or too long).' });
-        const r = await download({ code: body.code.replace(/\r\n/g, '\n'), slot, name: cleanName(body.name), run: body.run === true, lang: body.lang === 'cpp' ? 'cpp' : 'python' });
-        return json(200, { ok: r.code === 0, out: r.out });
+        const options={ code: body.code.replace(/\r\n/g, '\n'), slot, name: cleanName(body.name), run: body.run === true, lang: body.lang === 'cpp' ? 'cpp' : 'python' };
+        if(body.stream===true){
+          return streamOperation(res,async onProgress=>{const r=await download({...options,onProgress});return {ok:r.code===0,out:r.out,warning:r.warning};});
+        }
+        const r = await download(options);
+        return json(200, { ok: r.code === 0, out: r.out, warning:r.warning });
+      }
+      if(url.pathname==='/api/bluetooth/build'){
+        if(typeof body.code!=='string'||!body.code.trim()||body.code.length>MAX_CODE)return json(400,{error:'No code to build (or too long).'});
+        const built=await buildCpp(body.code.replace(/\r\n/g,'\n'));
+        try{return json(200,{ok:built.ok,out:built.out,binary:built.ok?fs.readFileSync(built.bin).toString('base64'):undefined});}
+        finally{if(built.dir)fs.rmSync(built.dir,{recursive:true,force:true});}
       }
       if (url.pathname === '/api/build') {
         if (typeof body.code !== 'string' || !body.code.trim() || body.code.length > MAX_CODE) return json(400, { error: 'No code to build (or too long).' });
-        const b = await buildCpp(body.code.replace(/\r\n/g, '\n'));
-        if (b.dir) fs.rmSync(b.dir, { recursive: true, force: true });
-        return json(200, { ok: b.ok, out: b.ok ? (b.out.trim() + '\nBuild OK.') : b.out });
+        const build=async()=>{
+          const b=await buildCpp(body.code.replace(/\r\n/g,'\n'));
+          if(b.dir)fs.rmSync(b.dir,{recursive:true,force:true});
+          return {ok:b.ok,out:b.ok?(b.out.trim()+'\nBuild OK.'):b.out};
+        };
+        if(body.stream===true)return streamOperation(res,onProgress=>{onProgress({phase:'build',percent:null});return build();});
+        return json(200,await build());
       }
       if (url.pathname === '/api/probe') {
         const slot = cleanSlot(body.slot) || 8;
@@ -317,9 +346,11 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/run' || url.pathname === '/api/stop' || url.pathname === '/api/erase') {
         const slot = cleanSlot(body.slot);
         if (url.pathname !== '/api/stop' && !slot) return json(400, { error: 'Slot must be 1 to 8.' });
-        const args = url.pathname === '/api/stop' ? ['--stop'] : url.pathname === '/api/run' ? ['--slot', String(slot), '--load'] : ['--erase', String(slot)];
-        const r = await brainConsole.withSuspended(()=>vexcom(args, 30000));
-        return json(200, { ok: r.code === 0, out: r.out });
+        const warning=url.pathname==='/api/run'?await prepareConsole():'';
+        const args = url.pathname === '/api/stop' ? ['--stop'] : url.pathname === '/api/run' ? ['--slot', String(slot), '--run'] : ['--erase', String(slot)];
+        const admin=brainConsole.adminPort();if(admin)args.push(admin);
+        const r = await vexcom(args, 30000);r.out+=warning;
+        return json(200, { ok: r.code === 0, out: r.out, warning });
       }
       return json(404, { error: 'No such call.' });
     } catch (e) {
@@ -329,9 +360,25 @@ const server = http.createServer(async (req, res) => {
 
   // The help page renders the same guide that GitHub shows; only this one file outside public/ is served.
   if (url.pathname === '/docs/TROUBLESHOOTING.md') return sendFile(res, path.join(ROOT, 'TROUBLESHOOTING.md'));
+  if(url.pathname==='/simulator-python-worker.js')res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/pyodide/ http://${host}/simulator-vex.py; worker-src 'none'; child-src 'none';`);
+  if(url.pathname==='/compiler-worker.mjs')res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/compiler/ http://${host}/compiler/; worker-src 'none'; child-src 'none';`);
+  if(url.pathname==='/simulator-code-worker.mjs'){
+    // User code has no network path to the app's USB-control API, even via Python's js module.
+    res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/preview/python/ http://${host}/simulator-vex.py http://${host}/simulator-vex-async.py; worker-src 'none'; child-src 'none';`);
+  }
+  for(const [prefix,folder]of [['/vendor/compiler/','microbit-clang-wasm/gen'],['/vendor/dagre/','@dagrejs/dagre/dist'],['/vendor/preview/asyncify/','asyncify-wasm/dist'],['/vendor/preview/wasi/','@bjorn3/browser_wasi_shim/dist'],['/vendor/preview/python/','pyodide']]){
+    if(url.pathname.startsWith(prefix)){
+      const f=inside(path.join(ROOT,'node_modules',folder),url.pathname.slice(prefix.length));
+      return f?sendFile(res,f):void res.writeHead(404).end('Not found');
+    }
+  }
   if (url.pathname.startsWith('/vendor/blockly/')) {
     const f = inside(path.join(ROOT, 'node_modules', 'blockly'), url.pathname.slice('/vendor/blockly/'.length));
     return f ? sendFile(res, f) : void res.writeHead(404).end('Not found');
+  }
+  if (url.pathname.startsWith('/vendor/pyodide/')) {
+    const f = inside(path.join(ROOT, 'node_modules', 'pyodide'), url.pathname.slice('/vendor/pyodide/'.length));
+    return f ? sendFile(res, f, 'public, max-age=3600') : void res.writeHead(404).end('Not found');
   }
   const f = inside(path.join(ROOT, 'public'), url.pathname === '/' ? 'index.html' : url.pathname.slice(1));
   return f ? sendFile(res, f) : void res.writeHead(404).end('Not found');

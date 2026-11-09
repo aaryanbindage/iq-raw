@@ -55,6 +55,11 @@ try {
   assert.equal(where('Cannot reach the iq-raw server. Start it again'), 'the-page-will-not-load-or-looks-broken');
   assert.equal(where('No IQ brain console port found.'), 'live-console');
   assert.equal(where('No code to send (or too long).'), 'downloading-slots-and-names');
+  assert.equal(where('Bluetooth requires Chrome or Edge with Web Bluetooth support.'), 'bluetooth');
+  assert.equal(where('Bluetooth response timed out. Transfer completion was not confirmed.'), 'bluetooth');
+  assert.equal(where('Connect and pair an IQ2 brain first.'), 'bluetooth');
+  assert.equal(where('Console connection failed: busy\nProgram output may be missed'), 'live-console');
+  assert.equal(where('The C++ preview compiler is not installed. Run npm run setup-preview once, then retry.'), 'brain-preview-and-program-tree');
   assert.equal(where('something nobody has seen before'), 'start-here');
   console.log('ok - console errors link to the matching troubleshooting section');
 } finally {

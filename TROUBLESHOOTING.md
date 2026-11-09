@@ -97,7 +97,7 @@ Exit codes 2, 4 or 6. Only one program at a time can use the brain's USB ports.
 1. **VEXcode IQ:** disconnect the brain inside VEXcode IQ, or save your work and quit it.
 2. **VS Code's VEX extension:** it connects to the brain when you open a VEX project. Close that project or VS Code.
 3. **Serial monitors:** Arduino IDE, PuTTY, `screen`, `minicom` and similar tools hold the port while open.
-4. **iq-raw's own console:** iq-raw disconnects it automatically during downloads, run, stop and VM installs, then reconnects. Another browser tab or a second iq-raw server does not share that pause. Close extra tabs and servers.
+4. **iq-raw's own console** is not the cause: it listens on the brain's separate user port, and downloads and program control go to the admin port. Installing the Python VM pauses the console and reconnects it afterwards. A **second iq-raw server** (for example on another port) is a separate app, though: close it.
 5. **Unplug and replug** the brain after closing the other app. Then press **Check brain** before downloading again.
 
 On macOS the error names the apps holding the port. On Windows and Linux it lists the brain's ports so you can tell "no brain" apart from "brain present but busy".
@@ -164,13 +164,43 @@ The toolchain folder must match your system: `toolchain_osxarm64` or `toolchain_
 
 **`No IQ brain console port found`.** `vexcom` did not report the brain's user port. Connect the brain directly by USB, close VEXcode's connection, and press **Check brain** first.
 
-**`The console is paused for a brain transfer`.** A download, run, stop or VM install is in progress. The console reconnects by itself when it finishes.
+**`The console is paused for a brain transfer`.** The Python VM is being installed, which can reset the brain's USB connection. The console reconnects by itself when it finishes.
 
 **`Could not open the brain console`.** Another app has the port. See [The brain is busy or the port is in use](#the-brain-is-busy-or-the-port-is-in-use).
 
-**Connected, but nothing appears.** The running program is not printing, or it was started before you connected and its earlier output was lost. Connect first, then run. The console keeps the last 64 KB of output.
+**`Console connection failed … Program output may be missed`.** **Download and run** and **Run slot** connect the console before starting the program, so its first prints are caught. If that fails, the program still runs, but early output is lost. Fix the console error, press **Connect brain**, then run again.
 
-**Input.** The input box sends one line, ending in a newline, to the running program (for `ask` blocks). Each send is limited to 4096 bytes.
+**Connected, but nothing appears.** The running program is not printing, or it was started from the brain's own menu before you connected. Connect first, then run. During a build or download, program output is held back until the result (**Done.** or the failure) is shown, then appears. The console keeps the last 64 KB of output.
+
+**Input.** The input box sends one line, ending in a newline, to the running program (for `ask` blocks). Each send is limited to 4096 bytes over USB, and to under 1000 bytes over Bluetooth.
+
+## Bluetooth
+
+Choose **Transfer → Bluetooth**, then **Connect Bluetooth**. Over Bluetooth the browser talks to the brain itself, without `vexcom`.
+
+**`Bluetooth requires Chrome or Edge with Web Bluetooth support`.** Safari and Firefox do not support Web Bluetooth. Use Chrome or Edge, and turn the computer's Bluetooth on. On Linux, Chrome may also need Web Bluetooth enabled under `chrome://flags`.
+
+**The brain does not appear in the list.** Turn it on and keep it close. Disconnect it from VEXcode IQ or any other device first, since it accepts one Bluetooth connection at a time.
+
+**Pairing fails or `Enter the four-digit code`.** Type the code shown on the brain's screen when you connect. Codes are not saved, so you enter one each time. `Bluetooth pairing cancelled` means the chooser or code prompt was closed.
+
+**`Connect and pair an IQ2 brain first`.** The Bluetooth link dropped or was never made. Press **Connect Bluetooth** again.
+
+**`Bluetooth disconnected` or `Bluetooth response timed out` during a transfer.** The program may or may not be on the brain: completion was not confirmed. Move closer, reconnect, and download again.
+
+**`failed its length or checksum check`, `Unexpected Bluetooth response`, or `Brain rejected Bluetooth command`.** The radio link garbled a message, or the brain refused a step. Reconnect and retry. If it keeps happening, update VEXos and use USB in the meantime.
+
+**Python over Bluetooth:** `No usable Python VM found` means the brain has no Python VM. Install it once over USB with **Install Python VM**.
+
+## Brain preview and program tree
+
+The preview and the program tree run your program in the browser, so they need no brain. They are approximations: robot motion, sounds, fonts and timing differ from the real brain.
+
+**`Run C++ code` asks for setup.** The local app's C++ preview needs a one-time download of the WASI SDK compiler for your system (about 180 MB on macOS and Linux, 590 MB on Windows): run `npm run setup-preview` in the iq-raw folder, then retry. It installs to `~/.iq-raw/preview`.
+
+**`npm run setup-preview` fails.** `checksum did not match` means the download was damaged or incomplete; it is deleted, so run the command again. `extraction failed` on Windows means the built-in `tar.exe` is missing (Windows 10 version 1803 or later has it) or the disk is full. `No C++ preview compiler is published` means your CPU is not x64 or arm64.
+
+**The web editor's first C++ build is slow.** The hosted editor downloads about 100 MB of compiler files the first time. Later builds reuse them.
 
 ## My blocks or code disappeared
 
@@ -182,7 +212,7 @@ To start completely fresh, open the browser's developer tools (F12) → Applicat
 
 ## Running the tests
 
-`npm test` runs every suite. Suites that need VEX's C++ SDK print `skip` when it is not installed. The math and catalog suites need Python 3 (`python3`, `python` or `py`); on Windows, the Microsoft Store `python3` placeholder is skipped automatically. The native math check needs a C++ compiler on `PATH`.
+`npm test` runs every suite. Suites that need VEX's C++ SDK print `skip` when it is not installed. The math and catalog suites need Python 3 (`python3`, `python` or `py`); on Windows, the Microsoft Store `python3` placeholder is skipped automatically. The native math check needs a C++ compiler on `PATH`. The browser compiler has its own, slower check: `npm run test:web-compiler`.
 
 ## Reporting a problem
 

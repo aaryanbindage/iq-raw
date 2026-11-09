@@ -14,12 +14,13 @@ class FakePort extends EventEmitter {
   drain(callback){callback();}
 }
 let queries=0;
-const service=createConsole({SerialPort:FakePort,query:async()=>{queries++;return{code:0,out:JSON.stringify({device:{connection:'brain',user:'/dev/tty.usbmodemTEST'}})};}});
+const service=createConsole({SerialPort:FakePort,query:async()=>{queries++;return{code:0,out:JSON.stringify({device:{connection:'brain',admin:'/dev/tty.usbmodemADMIN',user:'/dev/tty.usbmodemTEST'}})};}});
 const response=new EventEmitter();response.frames=[];response.writeHead=()=>{};response.write=text=>(response.frames.push(text),true);response.end=()=>response.emit('close');
 service.subscribe({},response);
 await Promise.all([service.connect(),service.connect()]);assert.equal(queries,1);
 const port=FakePort.instances[0];assert.equal(port.options.path,'/dev/cu.usbmodemTEST');
 assert.equal(service.state().connected,true);
+assert.equal(service.adminPort(),'/dev/tty.usbmodemADMIN','Commands must target the separate discovered admin port');
 const bytes=Buffer.from('π\n');port.emit('data',bytes.subarray(0,1));port.emit('data',bytes.subarray(1));
 assert.ok(response.frames.some(frame=>frame.includes('π')));
 await service.input('hello\n');assert.deepEqual(port.written,['hello\n']);
@@ -33,14 +34,18 @@ assert.equal(service.state().connected,true,'Console should reconnect after a fa
 assert.equal(queries,2);
 service.clear();assert.ok(response.frames.some(frame=>frame.includes('event: clear')));
 await service.disconnect();assert.equal(service.state().connected,false);
+assert.equal(service.adminPort(),null);
 await assert.rejects(service.input('hello'),/Connect/);
 await service.close();
 const bad=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:'{"device":{"connection":"brain","user":"/etc/passwd"}}'})});
 await assert.rejects(bad.connect(),/No IQ brain console port/);
-for(const user of ['COM7','/dev/ttyACM1']){
-  const other=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:JSON.stringify({device:{connection:'brain',user}})})});
-  await other.connect();assert.equal(FakePort.instances.at(-1).options.path,user,user+' should open as-is');await other.close();
+for(const [user,admin] of [['COM7','COM6'],['/dev/ttyACM1','/dev/ttyACM0']]){
+  const other=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:JSON.stringify({device:{connection:'brain',user,admin}})})});
+  await other.connect();assert.equal(FakePort.instances.at(-1).options.path,user,user+' should open as-is');
+  assert.equal(other.adminPort(),admin,admin+' should be the admin port');await other.close();
 }
+const oddAdmin=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:JSON.stringify({device:{connection:'brain',user:'COM7',admin:'--erase'}})})});
+await oddAdmin.connect();assert.equal(oddAdmin.adminPort(),null,'an admin value that is not a port name must not reach vexcom');await oddAdmin.close();
 for(const user of ['COM7 ','\\\\.\\COM7','/dev/ttyACM1/../sda','/dev/ttyUSB0']){
   const other=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:JSON.stringify({device:{connection:'brain',user}})})});
   await assert.rejects(other.connect(),/No IQ brain console port/,user+' must be refused');

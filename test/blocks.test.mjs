@@ -65,6 +65,7 @@ assert.ok(start.nextConnection);
 assert.equal(start.hat, 'cap');
 const startupPy = pythonGenerator.workspaceToCode(startup);
 const startupCpp = Blockly.Cpp.workspaceToCode(startup);
+assert.ok(startupCpp.indexOf('setvbuf(stdout, nullptr, _IONBF, 0);')<startupCpp.indexOf('// When started'),'Console must be unbuffered before user startup code');
 assert.match(startupPy, /# When started\nfor .* in range\(2\):\n    brain.screen.clear_screen\(\)/);
 assert.match(startupPy, /motor_2.spin\(FORWARD, 25, PERCENT\)\nmotor_2.stop\(\)/);
 assert.match(startupCpp, /\/\/ When started\n    for \(int i_0 = 0;/);
@@ -89,9 +90,11 @@ const { server } = require('../server.js');
 await new Promise((r) => server.listen(5199, '127.0.0.1', r));
 const get = (p, h = {}) => fetch('http://127.0.0.1:5199' + p, { headers: h });
 assert.equal((await get('/')).status, 200);
-for (const asset of ['/settings.html', '/base.css', '/app.css', '/theme.js', '/preferences.js', '/settings.js']) {
+for (const asset of ['/settings.html', '/base.css', '/app.css', '/theme.js', '/preferences.js', '/settings.js', '/transfer-ui.js', '/simulator-core.js', '/simulator-worker.js', '/simulator-screen.js', '/simulator-ui.js', '/simulator-devices.js', '/simulator-audio.js', '/simulator-python.js', '/simulator-python-worker.js', '/simulator-vex.py', '/vendor/pyodide/pyodide.mjs', '/vendor/pyodide/pyodide.asm.wasm', '/assets/iq2-brain-simulator.png']) {
   assert.equal((await get(asset)).status, 200, asset + ' should be served');
 }
+assert.equal((await get('/vendor/pyodide/pyodide.asm.wasm')).headers.get('content-type'), 'application/wasm');
+assert.equal((await get('/')).headers.get('cross-origin-embedder-policy'), 'require-corp', 'the Python preview needs cross-origin isolation');
 assert.equal((await get('/vendor/blockly/blockly_compressed.js')).status, 200);
 assert.equal((await get('/vendor/blockly/../../package.json')).status, 404);
 assert.equal((await get('/%2e%2e/server.js')).status, 404);
@@ -105,7 +108,10 @@ assert.equal((await post({ code: 'x', slot: 1 }, { origin: 'http://evil.example'
 assert.equal((await fetch('http://127.0.0.1:5199/api/download', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status, 415);
 console.log('ok - server guards');
 // a real compile of a pin program with VEX's own toolchain (skipped if the extension's SDK is not installed)
-const sdkThere = (await (await fetch('http://127.0.0.1:5199/api/build', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: 'x' }) })).json()).out.includes('were not found') === false;
+const buildStream=await fetch('http://127.0.0.1:5199/api/build',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:'x',stream:true})});
+const buildEvents=(await buildStream.text()).trim().split('\n').map(JSON.parse);
+assert.equal(buildEvents[0].phase,'build');assert.equal(buildEvents.at(-1).type,'result');
+const sdkThere=buildEvents.at(-1).out.includes('were not found')===false;
 if (sdkThere) {
   const wsPins = new Blockly.Workspace();
   Blockly.serialization.workspaces.load({ blocks: { languageVersion: 0, blocks: [chain([
@@ -147,6 +153,7 @@ else if (process.env.IQRAW_TEST_MODE === 'silent') { console.error('Device: /dev
 else if (process.env.IQRAW_TEST_MODE === 'port') process.exitCode = 6;
 else if (process.env.IQRAW_TEST_MODE === 'version') process.exitCode = 3;
 else if (process.env.IQRAW_TEST_MODE === 'partial') {console.log('{"phase":"program","action":"download","percent":7}');console.error('unknown response; usage unavailable');process.exitCode=4;}
+else if (process.env.IQRAW_TEST_MODE === 'progress') {process.stdout.write('{"phase":"program","action":"download","per');setTimeout(()=>{process.stdout.write('cent":7}\\n');setTimeout(()=>{fs.writeFileSync(process.env.IQRAW_TEST_CALLS+'.done','done');console.log('{"status":0}');},300);},25);}
 else console.log('{"status":0,"message":"Download complete"}');
 `);
   fs.chmodSync(tool, 0o755);
@@ -185,12 +192,21 @@ else console.log('{"status":0,"message":"Download complete"}');
   const beforeOld = attempts().length;
   const old = await send('old', true);
   assert.equal(old.ok, true);
+  assert.match(old.warning,/Console connection failed/,'A successful download must still expose a failed terminal connection');
   const fallback = attempts().slice(beforeOld);
   assert.equal(fallback.length, 2);
   assert.ok(fallback[0].args.includes('--name'));
   assert.ok(!fallback[1].args.includes('--name'));
   assert.ok(fallback[1].args.includes('--run'));
   assert.ok(!fs.existsSync(fallback[1].file), 'temporary code should be cleaned after success');
+  process.env.IQRAW_TEST_MODE='progress';
+  const streaming=await post({code:'print("hello")',slot:8,stream:true});
+  assert.match(streaming.headers.get('content-type'),/application\/x-ndjson/);
+  const reader=streaming.body.getReader(),decoder=new TextDecoder();let text='';
+  while(!text.includes('"percent":7')){const chunk=await reader.read();assert.equal(chunk.done,false);text+=decoder.decode(chunk.value,{stream:true});}
+  assert.equal(fs.existsSync(calls+'.done'),false,'Progress must arrive before vexcom exits');
+  while(true){const chunk=await reader.read();if(chunk.done)break;text+=decoder.decode(chunk.value,{stream:true});}
+  const events=text.trim().split('\n').map(JSON.parse);assert.equal(events.at(-1).type,'result');assert.equal(events.at(-1).ok,true);
   console.log('ok - download flags, silent errors, signals, compatibility and cleanup (mock tool)');
 } finally {
   if (originalVexcom === undefined) delete process.env.VEXCOM;
