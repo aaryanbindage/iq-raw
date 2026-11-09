@@ -43,6 +43,7 @@
   function kind(b){if(b.type.startsWith('controls_')||['iqv_forever','iqv_repeat_until','iq_wait_until'].includes(b.type))return 'Control';if(b.type==='variables_get'||/_get$/.test(b.type)||b.type.startsWith('iq_b_')||['math_number','text','logic_boolean','iqm_constant','math_constant'].includes(b.type))return 'Data provider';if(/^(math_|logic_|iqm_)/.test(b.type))return 'Operator';if(/^(iq_ev_|iq_when_)/.test(b.type))return 'Event';return 'Action';}
   function attach(ws){
     const $=id=>document.getElementById(id),dialog=$('programTree'),svg=$('treeGraph'),summary=$('treeSummary'),inspector=$('treeInspector');
+    const labels=document.createElement('div');labels.className='graph-link-labels';labels.setAttribute('aria-hidden','true');svg.parentElement.append(labels);
     const ns='http://www.w3.org/2000/svg',element=(name,attrs={},text)=>{const el=document.createElementNS(ns,name);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,String(v));if(text!==undefined)el.textContent=text;return el;};
     const colours={provider:'#53c9e9',operator:'#ab94ff',control:'#ffbe5c',event:'#f0cc5a',action:'#79d5aa',unknown:'#73839c',taken:'#66dfa5',blocked:'#ee8893',error:'#ff626e'};
     const icons={provider:'M3 5c0-4 18-4 18 0s-18 4-18 0m0 0v14c0 4 18 4 18 0V5M3 12c0 4 18 4 18 0',operator:'M4 5h16M12 2v6M4 16h7m-3-3v6m7-5 5 5m0-5-5 5',control:'m12 2 10 10-10 10L2 12Z',event:'m13 2-9 12h7l-1 8 10-12h-7Z',action:'M3 12h18m-6-6 6 6-6 6'};
@@ -63,6 +64,7 @@
         cameraFrame=null;const width=svg.clientWidth||900,height=svg.clientHeight||600;
         const box={x:-view.x/view.scale,y:-view.y/view.scale,width:width/view.scale,height:height/view.scale};
         svg.setAttribute('viewBox',`${box.x} ${box.y} ${box.width} ${box.height}`);
+        for(const edge of edges){if(!edge.text)continue;edge.text.style.left=(view.x+edge.labelX*view.scale)+'px';edge.text.style.top=(view.y+(edge.labelY-14)*view.scale)+'px';}
         const background=svg.querySelector('.graph-backdrop');if(background)for(const[k,v]of Object.entries(box))background.setAttribute(k,String(v));
       });
     };
@@ -86,7 +88,7 @@
       const locate=document.createElement('button');locate.type='button';locate.textContent='Locate in block workspace';locate.onclick=()=>{if(ws.getBlockById(node.id)){dialog.close();ws.centerOnBlock(node.id);ws.highlightBlock(node.id);ws.getBlockById(node.id).select();}};inspector.append(locate);
     }
     function drawGraph(){
-      svg.replaceChildren();edges=[];nodeViews.clear();graph=new root.dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:36,ranksep:100,marginx:32,marginy:32}).setDefaultEdgeLabel(()=>({}));
+      svg.replaceChildren();labels.replaceChildren();edges=[];nodeViews.clear();graph=new root.dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:36,ranksep:100,marginx:32,marginy:32}).setDefaultEdgeLabel(()=>({}));
       const defs=element('defs'),pattern=element('pattern',{id:'graph-grid',width:22,height:22,patternUnits:'userSpaceOnUse'});pattern.append(element('circle',{cx:1,cy:1,r:1,fill:'var(--line)'}));defs.append(pattern);for(const[color,hex]of Object.entries(colours)){const marker=element('marker',{id:'graph-arrow-'+color,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'});marker.append(element('path',{d:'M0 0 10 5 0 10Z',fill:hex}));defs.append(marker);}svg.append(defs,element('rect',{class:'graph-backdrop',x:0,y:0,width:900,height:600,fill:'url(#graph-grid)'}));
       for(const node of model.nodes)graph.setNode(node.id,{width:246,height:100});
       const connect=(from,to,label,kind,key)=>{const edge={from,to,label,kind,key,id:'edge-'+edges.length};edges.push(edge);graph.setEdge(from,to,{label,width:Math.min(150,label.length*7),height:18},edge.id);};
@@ -96,7 +98,15 @@
       }
       root.dagre.layout(graph);
       const world=element('g',{class:'graph-world'}),wireLayer=element('g',{class:'graph-connections'}),nodesLayer=element('g');world.append(wireLayer,nodesLayer);svg.append(world);
-      for(const edge of edges){const layout=graph.edge({v:edge.from,w:edge.to,name:edge.id}),points=layout.points;const d=points.map((p,i)=>(i?'L':'M')+p.x+' '+p.y).join(' ');const wire=element('path',{d,fill:'none','stroke-width':2.5,class:'graph-edge','marker-end':'url(#graph-arrow-unknown)'}),text=element('text',{x:layout.x,y:layout.y-6,'text-anchor':'middle',class:'graph-edge-label'},edge.label);const labelBackground=element('rect',{x:layout.x-Math.min(150,edge.label.length*7)/2-5,y:layout.y-20,width:Math.min(150,edge.label.length*7)+10,height:19,rx:4,fill:'var(--bg)',class:'graph-edge-label-background'});wireLayer.append(wire,labelBackground,text);edge.view=wire;edge.text=text;}
+      for(const edge of edges){
+        const layout=graph.edge({v:edge.from,w:edge.to,name:edge.id}),points=layout.points;
+        const d=points.map((p,i)=>(i?'L':'M')+p.x+' '+p.y).join(' ');
+        const wire=element('path',{d,fill:'none','stroke-width':2.5,class:'graph-edge','marker-end':'url(#graph-arrow-unknown)'});
+        wireLayer.append(wire);
+        // Ordinary HTML text avoids WebKit's SVG glyph clipping and repaint bugs.
+        const text=document.createElement('span');text.className='graph-link-label';text.textContent=edge.label;labels.append(text);
+        edge.view=wire;edge.text=text;edge.labelX=layout.x;edge.labelY=layout.y;
+      }
       for(const node of model.nodes){
         const pos=graph.node(node.id),type=category(node.block),colour=colours[type]||colours.action;
         const group=element('g',{transform:`translate(${pos.x-123} ${pos.y-50})`,class:'graph-node',tabindex:0,role:'button','aria-label':kind(node.block)+': '+label(node),'data-node-id':node.id});
@@ -108,7 +118,7 @@
     }
     function update(){
       for(const node of model.nodes){const el=nodeViews.get(node.id),record=records.get(node.id),state=record?.error?'error':node.unreachable?'blocked':record?.count?'taken':'unknown';el.classList.toggle('selected',selected===node.id);el.querySelector('.graph-status-dot').style.fill=colours[state];el.querySelector('.graph-status').textContent=record?.error?'Error · select for cause':node.unreachable?'Never activates':record?.count?`Observed ${record.count}×`:'Not observed · may activate';el.querySelector('.graph-status').setAttribute('fill',colours[state]);el.querySelector('.graph-value').textContent=record&&'value'in record?short(valueText(record.value),37):record?.conditions?short(Object.entries(record.conditions).map(([k,v])=>`${k} T:${v.true} F:${v.false}`).join('  ')):node.unreachable?'Statically unreachable':record?.count?'Executed':'Awaiting trace';}
-      for(const edge of edges){const from=records.get(edge.from),to=records.get(edge.to),target=model.byId.get(edge.to);let state=target.unreachable?'blocked':edge.kind==='branch'?(from?.branches?.[edge.key]?'taken':'unknown'):to?.count&&from?.count?'taken':'unknown';if(to?.error)state='error';edge.view.style.stroke=colours[state];edge.view.setAttribute('marker-end','url(#graph-arrow-'+state+')');edge.view.setAttribute('stroke-dasharray',state==='unknown'?'5 6':state==='blocked'?'3 5':'');edge.text.style.fill=colours[state];}
+      for(const edge of edges){const from=records.get(edge.from),to=records.get(edge.to),target=model.byId.get(edge.to);let state=target.unreachable?'blocked':edge.kind==='branch'?(from?.branches?.[edge.key]?'taken':'unknown'):to?.count&&from?.count?'taken':'unknown';if(to?.error)state='error';edge.view.style.stroke=colours[state];edge.view.setAttribute('marker-end','url(#graph-arrow-'+state+')');edge.view.setAttribute('stroke-dasharray',state==='unknown'?'5 6':state==='blocked'?'3 5':'');edge.text.style.color=colours[state];}
       // Last-writer dependencies are real runtime links, separate from structural wiring.
       svg.querySelector('.graph-provider-links')?.remove();const links=element('g',{class:'graph-provider-links'});for(const[id,r]of records){if(!r.provider||!graph.hasNode(id)||!graph.hasNode(r.provider))continue;const a=graph.node(r.provider),b=graph.node(id),wire=element('path',{d:`M${a.x} ${a.y-50} C${a.x} ${Math.min(a.y,b.y)-120},${b.x} ${Math.min(a.y,b.y)-120},${b.x} ${b.y-50}`,fill:'none',stroke:colours.provider,'stroke-width':2,'stroke-dasharray':'4 4','marker-end':'url(#graph-arrow-provider)'});wire.append(element('title',{},'Value supplied by the last executed assignment'));links.append(wire);}svg.querySelector('.graph-world').prepend(links);
       $('treeCount').textContent=`${model.nodes.length} nodes · ${model.nodes.filter(n=>n.unreachable).length} unreachable · ${records.size} observed`;details();
