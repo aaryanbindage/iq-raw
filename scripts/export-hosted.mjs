@@ -25,11 +25,12 @@ function tree(from,to,filter=()=>true){
   }
 }
 tree(path.join(root,'public'),target);
-for(const [folder,dest] of [['blockly','blockly'],['@dagrejs/dagre/dist','dagre'],['microbit-clang-wasm/gen','compiler'],['pyodide','preview/python'],['asyncify-wasm/dist','preview/asyncify'],['@bjorn3/browser_wasi_shim/dist','preview/wasi']]){
+for(const [folder,dest] of [['blockly','blockly'],['@dagrejs/dagre/dist','dagre'],['microbit-clang-wasm/gen','compiler'],['pyodide','preview/python'],['pyodide','pyodide'],['asyncify-wasm/dist','preview/asyncify'],['@bjorn3/browser_wasi_shim/dist','preview/wasi']]){
   // Vendor modules use relative imports; keep their contents untouched.
   const from=path.join(root,'node_modules',folder),to=path.join(target,'vendor',dest);fs.mkdirSync(to,{recursive:true});
   for(const entry of fs.readdirSync(from,{withFileTypes:true}))if(entry.isFile()&&/\.(js|mjs|wasm|zip|json|tar)$/.test(entry.name))fs.copyFileSync(path.join(from,entry.name),path.join(to,entry.name));
 }
+fs.cpSync(path.join(root,'node_modules/blockly/media'),path.join(target,'vendor/blockly/media'),{recursive:true});
 fs.mkdirSync(path.join(target,'vendor/blockly/msg'),{recursive:true});
 fs.copyFileSync(path.join(root,'node_modules/blockly/msg/en.js'),path.join(target,'vendor/blockly/msg/en.js'));
 let html=fs.readFileSync(path.join(target,'index.html'),'utf8');

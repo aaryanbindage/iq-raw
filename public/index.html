@@ -79,7 +79,7 @@
 </dialog>
 <dialog id="brainPreview" aria-labelledby="simTitle">
   <div class="sim-heading"><div><h2 id="simTitle">Brain preview</h2><p>Offline simulator · No brain or USB connection needed</p></div><button id="simClose" type="button" aria-label="Close brain preview">×</button></div>
-  <div class="sim-toolbar"><button id="simRun" class="primary" type="button">Run blocks</button><button id="simRunCode" type="button">Run code</button><button id="simStop" type="button" disabled>Stop</button><button id="simReset" type="button">Reset</button><button id="simAudio" type="button" aria-pressed="true">Sound on</button><span class="spacer"></span><button id="simEnlarge" type="button" aria-pressed="false">Enlarge screen</button><button id="simSave" type="button">Save screen</button></div>
+  <div class="sim-toolbar"><button id="simRun" class="primary" type="button">Run blocks</button><button id="simRunCode" type="button">Run code</button><button id="simStop" type="button" disabled>Stop</button><button id="simReset" type="button">Reset</button><button id="simAudio" type="button" aria-pressed="true">Sound on</button><label class="sim-sound"><input type="checkbox" id="simSound" checked> Sound effects</label><span class="spacer"></span><button id="simEnlarge" type="button" aria-pressed="false">Enlarge screen</button><button id="simSave" type="button">Save screen</button></div>
   <div class="sim-layout">
     <div class="sim-stage"><div id="simDevice" class="sim-device">
       <img src="/assets/iq2-brain-simulator.png" width="1448" height="1086" alt="Realistic illustration of an IQ2 brain with left and right arrows, Check and X buttons">
@@ -89,7 +89,7 @@
       <button id="simCheck" class="sim-device-key" type="button" aria-label="Brain Check button" title="Check: triggers brain-button blocks"></button>
       <button id="simCancel" class="sim-device-key" type="button" aria-label="Brain X: stop preview" title="X: stop preview"></button>
     </div><p class="sim-caption">160 × 108 pixels · Approximate fonts and timing</p></div>
-    <div class="sim-details"><p id="simStatus" role="status">Ready · no brain needed</p><p>Run blocks or the Python/C++ in your code editor. Preview drawing, math, console output and musical notes. Check and arrows provide button input; X stops the preview.</p><p>Physical devices and built-in sound recordings aren’t modeled. Unsupported APIs report an error. C++ threads and callbacks aren’t supported.</p><button id="simDemo" type="button">Try drawing demo</button><h3>Simulator output</h3><pre id="simLog" tabindex="0" aria-label="Simulator console output"></pre><form id="simInputForm"><label class="sr-only" for="simInput">Simulator input</label><input id="simInput" type="text" placeholder="Program input…" disabled><button id="simInputSend" type="submit" disabled>Send</button></form></div>
+    <div class="sim-details"><p id="simStatus" role="status">Ready · no brain needed</p><p>Run blocks or the Python/C++ in your code editor. Preview drawing, math, console output and musical notes. Check and arrows provide button input; X stops the preview.</p><p>Motors, drivetrain motion and sound effects are approximations. Unsupported sensors and C++ callbacks/threads are not modeled.</p><h3>Attached motors</h3><p id="simNoMotors">No motors attached by this preview yet.</p><ul id="simMotors" class="sim-motors" aria-label="Simulated attached motors"></ul><button id="simDemo" type="button">Try drawing demo</button><h3>Simulator output</h3><pre id="simLog" tabindex="0" aria-label="Simulator console output"></pre><form id="simInputForm"><label class="sr-only" for="simInput">Simulator input</label><input id="simInput" type="text" placeholder="Program input…" disabled><button id="simInputSend" type="submit" disabled>Send</button></form></div>
   </div>
 </dialog>
 <script src="/vendor/blockly/blockly_compressed.js"></script>
@@ -106,11 +106,14 @@
 <script src="/transfer-ui.js"></script>
 <script src="/bluetooth.js"></script>
 <script src="/bluetooth-ui.js"></script>
+<script src="/simulator-devices.js"></script>
+<script src="/simulator-audio.js"></script>
 <script src="/simulator-core.js"></script>
 <script src="/vendor/dagre/dagre.min.js"></script>
 <script src="/program-tree.js"></script>
 <script src="/compiler-ui.js"></script>
 <script src="/simulator-screen.js"></script>
+<script src="/simulator-audio.js"></script>
 <script src="/simulator-ui.js"></script>
 <script>
 (() => {
@@ -174,7 +177,7 @@
       scrollbarColour: 'var(--muted)',
     },
   });
-  const ws = Blockly.inject('blocklyDiv', { renderer: 'zelos', theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
+  const ws = Blockly.inject('blocklyDiv', { renderer: 'zelos', theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, media: '/vendor/blockly/media/', move: { scrollbars: true, drag: true, wheel: true } });
   new ResizeObserver(() => Blockly.svgResize(ws)).observe($('blocklyDiv'));
   const code = $('code');
   let manual = store.get('manual', '0') === '1';

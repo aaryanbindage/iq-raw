@@ -234,10 +234,14 @@ brain.screen.print("probe done")
 // ---- HTTP ----
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.mjs': 'text/javascript; charset=utf-8', '.wasm':'application/wasm', '.json':'application/json', '.py':'text/plain; charset=utf-8' };
 
-function sendFile(res, file) {
+// Cross-origin isolation lets the Python preview worker sleep and read the brain buttons through shared memory.
+// Everything the page loads is same-origin, so nothing breaks.
+const ISOLATION = { 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' };
+
+function sendFile(res, file, cache = 'no-store') {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404).end('Not found'); return; }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': cache, ...ISOLATION });
     res.end(data);
   });
 }
@@ -348,10 +352,11 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if(url.pathname==='/simulator-python-worker.js')res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/pyodide/ http://${host}/simulator-vex.py; worker-src 'none'; child-src 'none';`);
   if(url.pathname==='/compiler-worker.mjs')res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/compiler/ http://${host}/compiler/; worker-src 'none'; child-src 'none';`);
   if(url.pathname==='/simulator-code-worker.mjs'){
     // User code has no network path to the app's USB-control API, even via Python's js module.
-    res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/preview/python/ http://${host}/simulator-vex.py; worker-src 'none'; child-src 'none';`);
+    res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/preview/python/ http://${host}/simulator-vex.py http://${host}/simulator-vex-async.py; worker-src 'none'; child-src 'none';`);
   }
   for(const [prefix,folder]of [['/vendor/compiler/','microbit-clang-wasm/gen'],['/vendor/dagre/','@dagrejs/dagre/dist'],['/vendor/preview/asyncify/','asyncify-wasm/dist'],['/vendor/preview/wasi/','@bjorn3/browser_wasi_shim/dist'],['/vendor/preview/python/','pyodide']]){
     if(url.pathname.startsWith(prefix)){
@@ -362,6 +367,10 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname.startsWith('/vendor/blockly/')) {
     const f = inside(path.join(ROOT, 'node_modules', 'blockly'), url.pathname.slice('/vendor/blockly/'.length));
     return f ? sendFile(res, f) : void res.writeHead(404).end('Not found');
+  }
+  if (url.pathname.startsWith('/vendor/pyodide/')) {
+    const f = inside(path.join(ROOT, 'node_modules', 'pyodide'), url.pathname.slice('/vendor/pyodide/'.length));
+    return f ? sendFile(res, f, 'public, max-age=3600') : void res.writeHead(404).end('Not found');
   }
   const f = inside(path.join(ROOT, 'public'), url.pathname === '/' ? 'index.html' : url.pathname.slice(1));
   return f ? sendFile(res, f) : void res.writeHead(404).end('Not found');

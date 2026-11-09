@@ -90,9 +90,11 @@ const { server } = require('../server.js');
 await new Promise((r) => server.listen(5199, '127.0.0.1', r));
 const get = (p, h = {}) => fetch('http://127.0.0.1:5199' + p, { headers: h });
 assert.equal((await get('/')).status, 200);
-for (const asset of ['/settings.html', '/base.css', '/app.css', '/theme.js', '/preferences.js', '/settings.js', '/transfer-ui.js', '/simulator-core.js', '/simulator-worker.js', '/simulator-screen.js', '/simulator-ui.js', '/assets/iq2-brain-simulator.png']) {
+for (const asset of ['/settings.html', '/base.css', '/app.css', '/theme.js', '/preferences.js', '/settings.js', '/transfer-ui.js', '/simulator-core.js', '/simulator-worker.js', '/simulator-screen.js', '/simulator-ui.js', '/simulator-devices.js', '/simulator-audio.js', '/simulator-python.js', '/simulator-python-worker.js', '/simulator-vex.py', '/vendor/pyodide/pyodide.mjs', '/vendor/pyodide/pyodide.asm.wasm', '/assets/iq2-brain-simulator.png']) {
   assert.equal((await get(asset)).status, 200, asset + ' should be served');
 }
+assert.equal((await get('/vendor/pyodide/pyodide.asm.wasm')).headers.get('content-type'), 'application/wasm');
+assert.equal((await get('/')).headers.get('cross-origin-embedder-policy'), 'require-corp', 'the Python preview needs cross-origin isolation');
 assert.equal((await get('/vendor/blockly/blockly_compressed.js')).status, 200);
 assert.equal((await get('/vendor/blockly/../../package.json')).status, 404);
 assert.equal((await get('/%2e%2e/server.js')).status, 404);
