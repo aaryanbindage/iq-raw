@@ -101,6 +101,9 @@ try{
   assert.equal($('treeGraph').querySelectorAll('.graph-node').length,6);
   assert.equal($('treeGraph').querySelectorAll('.graph-edge').length,5,'The graph must connect actual input and branch nodes');
   assert.ok($('treeGraph').querySelector('.graph-node svg path'),'Graph nodes must contain vector icons');
+  assert.equal($('programTree').querySelectorAll('.graph-link-label').length,5,'Each connection must have a plain HTML label');
+  assert.ok([...$('programTree').querySelectorAll('.graph-link-label')].every(el=>el.namespaceURI==='http://www.w3.org/1999/xhtml'));
+  assert.equal($('treeGraph').querySelectorAll('.graph-edge-label-background').length,0,'Connection labels must not have capsule backgrounds');
   await new Promise(resolve=>w.requestAnimationFrame(resolve));
   const firstBox=$('treeGraph').getAttribute('viewBox');
   for(let i=0;i<5;i++)$('treeZoomOut').click();

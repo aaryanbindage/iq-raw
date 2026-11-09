@@ -265,3 +265,5 @@ input[aria-invalid="true"] { border-color:var(--bad); box-shadow:0 0 0 1px var(-
 .graph-canvas{background:var(--bg);contain:paint;isolation:isolate}#treeGraph{background:var(--bg);overflow:hidden;isolation:isolate}.graph-backdrop{pointer-events:none}
 /* Phones: Help and Settings fit beside the view buttons as icons; their names stay as tooltips and labels. */
 @media(max-width:520px) { #helpLink .button-label,#settingsLink .button-label { display:none; } #helpLink,#settingsLink { width:34px; min-width:34px; padding:6px; } }
+
+.graph-link-labels{position:absolute;inset:0;overflow:hidden;pointer-events:none;contain:paint}.graph-link-label{position:absolute;transform:translate(-50%,-50%);font:500 12px/1.3 system-ui,-apple-system,sans-serif;letter-spacing:normal;white-space:nowrap;background:none;border:0;border-radius:0;padding:0;text-shadow:none;pointer-events:none}
