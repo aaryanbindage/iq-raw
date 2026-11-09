@@ -11,7 +11,7 @@
       if(c.op==='font'){this.font=Math.max(1,Math.min(100,c.height));this.proportional=c.proportional;return;}
       if(c.op==='origin'){if([c.x,c.y].every(Number.isFinite))this.origin=[c.x,c.y];return;}
       if(c.op==='clip'){if([c.x,c.y,c.w,c.h].every(Number.isFinite))this.clip=[c.x,c.y,Math.max(0,c.w),Math.max(0,c.h)];return;}
-      if(c.op==='clear'){ctx.fillStyle='#000';ctx.fillRect(0,0,160,108);return;}
+      if(c.op==='clear'){ctx.fillStyle=c.colour?colour(c.colour)||'#000':'#000';ctx.fillRect(0,0,160,108);return;}
       if(c.op==='clearRow'){ctx.fillStyle='#000';ctx.fillRect(0,c.y,160,c.h);return;}
       const numbers=Object.values(c).filter(value=>typeof value==='number');
       if(numbers.some(n=>!Number.isFinite(n)||Math.abs(n)>32000))return;

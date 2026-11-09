@@ -24,6 +24,7 @@
     chip:'M7 7h10v10H7ZM3 8h4m-4 8h4m10-8h4m-4 8h4M8 3v4m8-4v4M8 17v4m8-4v4',
     settings:'M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6',
     code:'m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18', console:'m4 6 5 5-5 5m8 1h8',
+    tree:'M4 3v18m0-13h7m-7 9h7M11 5h9v6h-9ZM11 14h9v6h-9Z',
     fullscreen:'M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6',
     controls:'M4 6h16M4 12h16M4 18h16', refresh:'M20 8A8 8 0 1 0 20 16M20 3v5h-5',
     open:'M3 6h7l2 3h9l-3 11H3ZM3 10V6', save:'M4 3h13l3 3v15H4ZM8 3v6h8V3M8 21v-7h8v7',
@@ -46,13 +47,13 @@
     ws.getFlyout().iqrawDragOnly=true;
     ws.getFlyout().setAutoClose(true);
   }
-  function setup(ws,{api,log}) {
+  function setup(ws,{api,log,bluetooth}) {
     const $=id=>document.getElementById(id);
     for(const [id,name,label] of [
       ['send','send','Download and run'],['sendOnly','download','Download'],['run','play','Run slot'],['stop','stop','Stop'],['build','build','Build only'],['vm','chip','Install Python VM'],
       ['refresh','refresh','Check brain'],['open','open','Open code'],['save','save','Save code'],['programs','list','Programs on brain'],['probe','chip','Probe brain API'],['settingsLink','settings','Settings'],
     ]) iconize($(id),name,label);
-    for(const [id,name,label] of [['fullscreenToggle','fullscreen','Fullscreen focus mode'],['controlsToggle','controls','Program controls'],['codeToggle','code','Show or hide code'],['consoleToggle','console','Show or hide console'],['previewToggle','chip','Brain preview'],['consoleClear','clear','Clear console'],['consoleCopy','copy','Copy console']]) iconize($(id),name,label,true);
+    for(const [id,name,label] of [['treeToggle','tree','Program tree'],['fullscreenToggle','fullscreen','Fullscreen focus mode'],['controlsToggle','controls','Program controls'],['codeToggle','code','Show or hide code'],['consoleToggle','console','Show or hide console'],['previewToggle','chip','Brain preview'],['consoleClear','clear','Clear console'],['consoleCopy','copy','Copy console']]) iconize($(id),name,label,true);
     const source=$('sourcePanel'),consolePanel=$('consolePanel');
     const state={code:true,console:true,controls:true};
     const paint=()=>{
@@ -83,23 +84,27 @@
     const terminal=IQConsole.create($('log'),$('liveMonitors'));
     document.addEventListener('iqraw-command-start',()=>terminal.hold());
     document.addEventListener('iqraw-command-end',()=>terminal.release());
-    $('consoleClear').onclick=async()=>{terminal.clear();try{await api('console/clear',{});}catch(e){log(e.message,'err');}};
+    $('consoleClear').onclick=async()=>{terminal.clear();if(bluetooth?.mode())return;try{await api('console/clear',{});}catch(e){log(e.message,'err');}};
     $('consoleCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('log').textContent);}catch{log('Copy failed. Select and copy the console text manually.','err');}};
-    let connected=false;
+    let connected=false,usbConnected=false;
+    document.addEventListener('iqraw-bluetooth-data',e=>{if(bluetooth?.mode())terminal.append(e.detail);});
+    document.addEventListener('iqraw-bluetooth-state',e=>{if(bluetooth?.mode())consoleState(e.detail.connected);});
+    document.addEventListener('iqraw-transport-change',()=>consoleState(bluetooth?.mode()?bluetooth.connected():usbConnected));
     const consoleState=on=>{
       connected=on;$('consoleConnect').textContent=on?'Disconnect':'Connect brain';
       $('consoleInput').disabled=!on;$('consoleSend').disabled=!on;
-      $('consoleStatus').textContent=on?'Live brain output':'Tool output · brain disconnected';
+      $('consoleStatus').textContent=on?(bluetooth?.mode()?'Live Bluetooth brain output':'Live brain output'):'Tool output · brain disconnected';
     };
     const stream=new EventSource('/api/console/events');
     stream.addEventListener('data',e=>{
       const data=JSON.parse(e.data);
-      terminal.append(data);
+      if(!bluetooth?.mode())terminal.append(data);
     });
-    stream.addEventListener('clear',()=>terminal.clear());
-    stream.addEventListener('state',e=>consoleState(JSON.parse(e.data).connected));
+    stream.addEventListener('clear',()=>{if(!bluetooth?.mode())terminal.clear();});
+    stream.addEventListener('state',e=>{usbConnected=JSON.parse(e.data).connected;if(!bluetooth?.mode())consoleState(usbConnected);});
     stream.addEventListener('console-error',e=>log(JSON.parse(e.data),'err'));
     $('consoleConnect').onclick=async()=>{
+      if(bluetooth?.mode()){if(connected)bluetooth.disconnect();else bluetooth.connect();return;}
       $('consoleConnect').disabled=true;
       try{const j=await api('console/'+(connected?'disconnect':'connect'),{});consoleState(j.connected);}
       catch(e){log(e.message,'err');}finally{$('consoleConnect').disabled=false;}
@@ -107,10 +112,10 @@
     $('consoleForm').onsubmit=async e=>{
       e.preventDefault();if(!connected)return;
       const text=$('consoleInput').value;
-      try{await api('console/input',{text:text+'\n'});log('› '+text);$('consoleInput').value='';}catch(e){log(e.message,'err');}
+      try{if(bluetooth?.mode())await bluetooth.input(text+'\n');else await api('console/input',{text:text+'\n'});log('› '+text);$('consoleInput').value='';}catch(e){log(e.message,'err');}
     };
     window.addEventListener('pagehide',()=>stream.close());
-    consoleState(false);paint();
+    consoleState(bluetooth?.mode()?bluetooth.connected():false);paint();
   }
   window.IQEditor={restore,setup};
 })();

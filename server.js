@@ -232,7 +232,7 @@ brain.screen.print("probe done")
 `;
 
 // ---- HTTP ----
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.mjs': 'text/javascript; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.mjs': 'text/javascript; charset=utf-8', '.wasm':'application/wasm', '.json':'application/json', '.py':'text/plain; charset=utf-8' };
 
 function sendFile(res, file) {
   fs.readFile(file, (err, data) => {
@@ -292,6 +292,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method !== 'POST') return json(405, { error: 'POST only' });
       const body = await readJson(req);
+      if(url.pathname==='/api/preview/compile')return json(200,await require('./preview/compiler').compile(body.code));
       if(url.pathname==='/api/console/connect') return json(200,{ok:true,...await brainConsole.connect()});
       if(url.pathname==='/api/console/disconnect') return json(200,{ok:true,...await brainConsole.disconnect()});
       if(url.pathname==='/api/console/input'){await brainConsole.input(body.text);return json(200,{ok:true});}
@@ -306,6 +307,12 @@ const server = http.createServer(async (req, res) => {
         }
         const r = await download(options);
         return json(200, { ok: r.code === 0, out: r.out, warning:r.warning });
+      }
+      if(url.pathname==='/api/bluetooth/build'){
+        if(typeof body.code!=='string'||!body.code.trim()||body.code.length>MAX_CODE)return json(400,{error:'No code to build (or too long).'});
+        const built=await buildCpp(body.code.replace(/\r\n/g,'\n'));
+        try{return json(200,{ok:built.ok,out:built.out,binary:built.ok?fs.readFileSync(built.bin).toString('base64'):undefined});}
+        finally{if(built.dir)fs.rmSync(built.dir,{recursive:true,force:true});}
       }
       if (url.pathname === '/api/build') {
         if (typeof body.code !== 'string' || !body.code.trim() || body.code.length > MAX_CODE) return json(400, { error: 'No code to build (or too long).' });
@@ -341,6 +348,17 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if(url.pathname==='/compiler-worker.mjs')res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/compiler/ http://${host}/compiler/; worker-src 'none'; child-src 'none';`);
+  if(url.pathname==='/simulator-code-worker.mjs'){
+    // User code has no network path to the app's USB-control API, even via Python's js module.
+    res.setHeader('Content-Security-Policy',`default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src http://${host}/vendor/preview/python/ http://${host}/simulator-vex.py; worker-src 'none'; child-src 'none';`);
+  }
+  for(const [prefix,folder]of [['/vendor/compiler/','microbit-clang-wasm/gen'],['/vendor/dagre/','@dagrejs/dagre/dist'],['/vendor/preview/asyncify/','asyncify-wasm/dist'],['/vendor/preview/wasi/','@bjorn3/browser_wasi_shim/dist'],['/vendor/preview/python/','pyodide']]){
+    if(url.pathname.startsWith(prefix)){
+      const f=inside(path.join(ROOT,'node_modules',folder),url.pathname.slice(prefix.length));
+      return f?sendFile(res,f):void res.writeHead(404).end('Not found');
+    }
+  }
   if (url.pathname.startsWith('/vendor/blockly/')) {
     const f = inside(path.join(ROOT, 'node_modules', 'blockly'), url.pathname.slice('/vendor/blockly/'.length));
     return f ? sendFile(res, f) : void res.writeHead(404).end('Not found');

@@ -1,1 +1,6 @@
 node_modules
+
+public/compiler/iq2-sdk.json.gz
+hosted/
+firebase-debug.log
+public/vendor/

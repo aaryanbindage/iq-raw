@@ -19,6 +19,7 @@
   class PreviewError extends Error{constructor(message,block){super(message);this.blockId=block?.id;}}
   class Runtime{
     constructor(emit,options={}){
+      this.traceEnabled=Boolean(options.trace);this.providers=new Map();this.traceNodes=new Map();this.traceDirty=new Map();
       this.emit=emit;this.limit=options.limit||2000000;this.language=options.language||'python';
       this.vars=new Map();this.tables=new Map();this.complex=new Map();this.booleans=new Map();this.functions=new Map();
       this.active=true;this.steps=0;this.row=1;this.column=1;this.font=12;this.precision={screen:2,console:2};
@@ -33,7 +34,23 @@
       const p=this.precision[where];return typeof value==='number'&&p>=0&&Number.isFinite(value)?value.toFixed(p):String(value);
     }
     print(value,newline=false,precision=false){const text=precision?this.format(value,'screen'):String(value);this.draw('text',{text,x:(this.column-1)*this.font*.6,y:this.row*this.font});this.column+=text.length;if(newline){this.row++;this.column=1;}}
+    record(b,values={}){
+      if(!this.traceEnabled||!b?.id)return;
+      let node=this.traceNodes.get(b.id);if(!node){if(this.traceNodes.size>=5000)return;node={id:b.id,count:0};this.traceNodes.set(b.id,node);}
+      if(!values.update&&!values.branch&&!values.condition&&!values.error)node.count++;else if(!node.count)node.count=1;
+      delete values.update;
+      if(values.condition){const {input,value}=values.condition;node.conditions||={};node.conditions[input]||={true:0,false:0};node.conditions[input][String(value)]++;delete values.condition;}
+      if('value'in values){const value=values.value;values.value=typeof value==='string'?value.slice(0,256):value;if(typeof value==='boolean')node[value?'trueCount':'falseCount']=(node[value?'trueCount':'falseCount']||0)+1;}
+      if(values.branch){node.branches||={};node.branches[values.branch]=(node.branches[values.branch]||0)+1;delete values.branch;}
+      Object.assign(node,values);this.traceDirty.set(b.id,node);
+    }
+    takeTrace(){const nodes=[...this.traceDirty.values()];this.traceDirty.clear();return nodes;}
     expr(b,x=NaN,depth=0){
+      if(b?.disabled||b?.enabled===false)return 0;
+      try{const value=this.evaluate(b,x,depth);const provider=b?.type==='variables_get'?this.providers.get('var:'+variable(b)):b?.type==='iqv_bool_get'?this.providers.get('bool:'+field(b,'NAME')):b?.type==='iqm_complex_get'?this.providers.get('complex:'+field(b,'NAME')):undefined;this.record(b,{value,provider});return value;}
+      catch(error){if(error instanceof Error){if(!error.blockId)error.blockId=b?.id;this.record(b,{error:error.message});}throw error;}
+    }
+    evaluate(b,x=NaN,depth=0){
       if(!b)return 0;this.spend(b);if(depth>100)throw new PreviewError('Expression nesting is too deep.',b);
       const f=(n,d)=>field(b,n,d),v=(n,d=0)=>child(b,n)?this.expr(child(b,n),x,depth+1):d,t=b.type;
       if(t==='math_number')return Number(f('NUM',0));
@@ -102,9 +119,10 @@
     }
     async sleep(ms){const end=Date.now()+Math.max(0,Math.min(3600000,Number(ms)||0));do{if(!this.active)throw HALT;await new Promise(r=>setTimeout(r,Math.min(25,Math.max(0,end-Date.now()))));}while(Date.now()<end);}
     async loop(body,update,condition){while(condition()){try{await body();}catch(error){if(error===BREAK)break;if(error!==CONTINUE)throw error;}if(update)update();await this.sleep(0);}}
-    async stack(block){for(let b=block;b;b=b.next?.block){if(b.disabled||b.enabled===false)continue;this.spend(b);if(this.steps%50===0)await this.sleep(0);await this.statement(b);}}
+    async stack(block){for(let b=block;b;b=b.next?.block){if(b.disabled||b.enabled===false)continue;this.spend(b);if(this.steps%50===0)await this.sleep(0);this.record(b);try{await this.statement(b);}catch(error){if(error instanceof Error){if(!error.blockId)error.blockId=b.id;this.record(b,{error:error.message});}throw error;}}}
     async statement(b){
-      const f=(n,d)=>field(b,n,d),v=(n,d=0)=>child(b,n)?this.expr(child(b,n)):d,body=n=>this.stack(child(b,n)),t=b.type;
+      const f=(n,d)=>field(b,n,d),v=(n,d=0)=>child(b,n)?this.expr(child(b,n)):d,body=n=>{this.record(b,{branch:n});return this.stack(child(b,n));},t=b.type;
+      const condition=(name,defaultValue=false)=>{const value=Boolean(v(name,defaultValue));this.record(b,{condition:{input:name,value}});return value;};
       if(t==='iq_when_started'||t==='iqv_comment')return;
       if(t==='iq_print'){this.print(v('TEXT',''));return;}
       if(t==='iqm_print_complex'){this.print(this.format(z(v('Z')),'screen'));return;}
@@ -141,16 +159,16 @@
           previous={x:px,y:py};
         }return;
       }
-      if(t==='variables_set'||t==='math_change'){const key=variable(b);this.vars.set(key,t==='math_change'?(this.vars.get(key)||0)+v('DELTA'):v('VALUE'));return;}
-      if(t==='iqm_complex_set'){this.complex.set(f('NAME'),z(v('Z')));return;}
-      if(t==='iqv_bool_set'){this.booleans.set(f('NAME'),Boolean(v('VALUE',false)));return;}
-      if(t==='controls_if'){for(const condition of Object.keys(b.inputs||{}).filter(n=>/^IF\d+$/.test(n)).sort((a,b)=>Number(a.slice(2))-Number(b.slice(2))))if(v(condition,false)){await body('DO'+condition.slice(2));return;}await body('ELSE');return;}
+      if(t==='variables_set'||t==='math_change'){const key=variable(b);this.vars.set(key,t==='math_change'?(this.vars.get(key)||0)+v('DELTA'):v('VALUE'));this.providers.set('var:'+key,b.id);this.record(b,{value:this.vars.get(key),update:true});return;}
+      if(t==='iqm_complex_set'){this.complex.set(f('NAME'),z(v('Z')));this.providers.set('complex:'+f('NAME'),b.id);this.record(b,{value:this.complex.get(f('NAME')),update:true});return;}
+      if(t==='iqv_bool_set'){this.booleans.set(f('NAME'),Boolean(v('VALUE',false)));this.providers.set('bool:'+f('NAME'),b.id);this.record(b,{value:this.booleans.get(f('NAME')),update:true});return;}
+      if(t==='controls_if'){const conditionValue=condition;for(const condition of Object.keys(b.inputs||{}).filter(n=>/^IF\d+$/.test(n)).sort((a,b)=>Number(a.slice(2))-Number(b.slice(2))))if(conditionValue(condition)){const path='DO'+condition.slice(2);await body(path);return;}await body('ELSE');return;}
       if(t==='controls_repeat_ext'){let i=0;const n=Math.max(0,Math.trunc(v('TIMES')));await this.loop(()=>body('DO'),()=>i++,()=>i<n);return;}
-      if(['controls_whileUntil','iqv_forever','iqv_repeat_until'].includes(t)){await this.loop(()=>body('DO'),null,()=>t==='iqv_forever'?true:t==='iqv_repeat_until'?!v('COND',false):Boolean(v('BOOL',false))===(f('MODE')==='WHILE'));return;}
-      if(t==='controls_for'){const key=variable(b),a=v('FROM'),to=v('TO'),step=Math.abs(v('BY',1))*(a<=to?1:-1);if(!Number.isFinite(step)||step===0)throw new PreviewError('For-loop step must be finite and nonzero.',b);this.vars.set(key,a);await this.loop(()=>body('DO'),()=>this.vars.set(key,this.vars.get(key)+step),()=>step>0?this.vars.get(key)<=to:this.vars.get(key)>=to);return;}
+      if(['controls_whileUntil','iqv_forever','iqv_repeat_until'].includes(t)){await this.loop(()=>body('DO'),null,()=>t==='iqv_forever'?true:t==='iqv_repeat_until'?!condition('COND'):condition('BOOL')===(f('MODE')==='WHILE'));return;}
+      if(t==='controls_for'){const key=variable(b),a=v('FROM'),to=v('TO'),step=Math.abs(v('BY',1))*(a<=to?1:-1);if(!Number.isFinite(step)||step===0)throw new PreviewError('For-loop step must be finite and nonzero.',b);this.vars.set(key,a);this.providers.set('var:'+key,b.id);await this.loop(()=>body('DO'),()=>this.vars.set(key,this.vars.get(key)+step),()=>step>0?this.vars.get(key)<=to:this.vars.get(key)>=to);return;}
       if(t==='controls_flow_statements')throw f('FLOW')==='BREAK'?BREAK:CONTINUE;
       if(t==='iq_wait'||t==='iq_wait_units'){await this.sleep(v(t==='iq_wait'?'SECS':'T',1)*(t==='iq_wait'||f('U')==='SECONDS'?1000:1));return;}
-      if(t==='iq_wait_until'){await this.loop(()=>this.sleep(5),null,()=>!v('C',false));return;}
+      if(t==='iq_wait_until'){await this.loop(()=>this.sleep(5),null,()=>!condition('C'));return;}
       if(t==='iqv_stop_project'){this.stop();throw HALT;}
       if(t==='iq_b_timer_clear'){this.started=Date.now();return;}
       if(t==='iqv_console_precision'||t==='iqv_screen_precision'){this.precision[t.includes('console')?'console':'screen']=Number(f('DIGITS',2));return;}
@@ -174,11 +192,11 @@
     }
     stop(){this.active=false;for(const timer of this.timers)clearTimeout(timer);}
     fail(error){if(error===HALT)return;this.stop();this.emit({type:'error',message:error.message||'Invalid control flow outside a loop.',blockId:error.blockId});}
-    press(name,down){const changed=this.buttons[name]!==down;this.buttons[name]=down;if(!changed||!this.active)return;if(name==='check')for(const b of this.handlers.filter(b=>b.type===(down?'iq_ev_brain_pressed':'iq_ev_brain_released')))this.stack(child(b,'DO')).catch(error=>this.fail(error));}
+    press(name,down){const changed=this.buttons[name]!==down;this.buttons[name]=down;if(!changed||!this.active)return;if(name==='check')for(const b of this.handlers.filter(b=>b.type===(down?'iq_ev_brain_pressed':'iq_ev_brain_released'))){this.record(b);this.record(b,{branch:'DO'});this.stack(child(b,'DO')).catch(error=>this.fail(error));}}
     async run(state){
       const blocks=state.blocks?.blocks||[];
       for(const b of blocks){if(b.disabled||b.enabled===false)continue;if(b.type==='procedures_defnoreturn')this.functions.set(field(b,'NAME'),b);if(['iq_ev_brain_pressed','iq_ev_brain_released','iq_ev_brain_timer'].includes(b.type))this.handlers.push(b);}
-      for(const b of this.handlers.filter(b=>b.type==='iq_ev_brain_timer'))this.timers.push(setTimeout(()=>{if(this.active)this.stack(child(b,'DO')).catch(error=>this.fail(error));},Math.max(0,Number(field(b,'N',1000)))));
+      for(const b of this.handlers.filter(b=>b.type==='iq_ev_brain_timer'))this.timers.push(setTimeout(()=>{if(this.active){this.record(b);this.record(b,{branch:'DO'});this.stack(child(b,'DO')).catch(error=>this.fail(error));}},Math.max(0,Number(field(b,'N',1000)))));
       try{
         for(const b of blocks){if(b.disabled||b.enabled===false||this.handlers.includes(b)||b.type.startsWith('procedures_def'))continue;await this.stack(b);}
         this.emit({type:'finished',interactive:this.handlers.length>0});

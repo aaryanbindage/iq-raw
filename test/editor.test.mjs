@@ -10,6 +10,7 @@ const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(){return 
 w.SVGElement.prototype.getScreenCTM=()=>matrix;
 w.SVGElement.prototype.getCTM=()=>matrix;
 w.ResizeObserver=class{observe(){}disconnect(){}};
+w.TextEncoder=TextEncoder;w.TextDecoder=TextDecoder;
 w.matchMedia=()=>({matches:false,addEventListener(){}});
 w.EventSource=class{
   static instances=[];
@@ -22,7 +23,7 @@ w.fetch=async()=>({ok:true,json:async()=>({ok:false,out:'No mock brain'})});
 Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async()=>{}}});
 w.document.documentElement.requestFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:w.document.documentElement,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
 w.document.exitFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:null,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
-for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer','transfer-ui','simulator-screen','simulator-ui'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
+for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js','node_modules/@dagrejs/dagre/dist/dagre.min.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer','transfer-ui','bluetooth','bluetooth-ui','simulator-core','program-tree','simulator-screen','simulator-ui'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
 w.eval([...w.document.querySelectorAll('script')].find(s=>!s.src).textContent);
 const B=w.Blockly,ws=B.getMainWorkspace(),$=id=>w.document.getElementById(id);
 try{
@@ -90,5 +91,28 @@ try{
   $('simRight').onkeyup(new w.KeyboardEvent('keyup',{key:' '}));
   assert.equal(simulated.messages.at(-2).name,'right');assert.equal(simulated.messages.at(-2).down,true);assert.equal(simulated.messages.at(-1).down,false);
   $('simClose').click();assert.equal(simulated.terminated,true,'Closing preview must terminate its worker');assert.equal(preview.open,false);
+  const compareBlock={type:'logic_compare',id:'tree-cmp',fields:{OP:'GT'},inputs:{A:{block:{type:'math_number',id:'tree-a',fields:{NUM:3}}},B:{block:{type:'math_number',id:'tree-b',fields:{NUM:2}}}}};
+  const printBlock={type:'iq_print',id:'tree-print',inputs:{TEXT:{block:{type:'text',id:'tree-text',fields:{TEXT:'yes'}}}}};
+  B.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'controls_if',id:'tree-if',inputs:{IF0:{block:compareBlock},DO0:{block:printBlock}}}]}},ws);
+  $('programTree').showModal=()=> $('programTree').setAttribute('open','');
+  $('programTree').close=()=>{$('programTree').removeAttribute('open');$('programTree').dispatchEvent(new w.Event('close'));};
+  $('treeToggle').click();
+  assert.equal($('programTree').open,true);
+  assert.equal($('treeGraph').querySelectorAll('.graph-node').length,6);
+  assert.equal($('treeGraph').querySelectorAll('.graph-edge').length,5,'The graph must connect actual input and branch nodes');
+  assert.ok($('treeGraph').querySelector('.graph-node svg path'),'Graph nodes must contain vector icons');
+  await new Promise(resolve=>w.requestAnimationFrame(resolve));
+  const firstBox=$('treeGraph').getAttribute('viewBox');
+  for(let i=0;i<5;i++)$('treeZoomOut').click();
+  await new Promise(resolve=>w.requestAnimationFrame(resolve));
+  assert.notEqual($('treeGraph').getAttribute('viewBox'),firstBox,'Zoom must update the viewport camera');
+  assert.equal($('treeGraph').querySelectorAll('.graph-world').length,1,'Zoom must retain a single scene');
+  assert.equal($('treeGraph').querySelector('.graph-world').hasAttribute('transform'),false,'Zoom must not mutate a composited SVG group');
+  assert.equal($('treeGraph').querySelectorAll('.graph-node').length,6,'Repeated zoom must not duplicate nodes');
+  $('treeGraph').querySelector('[data-node-id="tree-cmp"]').dispatchEvent(new w.MouseEvent('click'));
+  assert.match($('treeInspector').textContent,/Operator/);assert.match($('treeInspector').textContent,/Input dependencies/);
+  $('treeRun').click();const traceWorker=w.Worker.instances.at(-1);assert.equal(traceWorker.messages[0].trace,true);
+  $('treeClose').click();assert.equal(traceWorker.terminated,true);
+  console.log('ok - fullscreen dependency graph with real nodes, vector icons, connections, node inspector and trace worker');
   console.log('ok - starter persistence, drag-only clicks, drag creation, dot categories, Zelos and fullscreen pane restoration');
 }finally{ws.dispose();dom.window.close();}
