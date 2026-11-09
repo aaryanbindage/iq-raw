@@ -160,7 +160,7 @@
       scrollbarColour: 'var(--muted)',
     },
   });
-  const ws = Blockly.inject('blocklyDiv', { renderer: 'zelos', theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { scrollbars: true, drag: true, wheel: true } });
+  const ws = Blockly.inject('blocklyDiv', { renderer: 'zelos', theme, toolbox: Blockly.IQ_TOOLBOX, grid: { spacing: 24, length: 2, colour: '#8884', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, media: '/vendor/blockly/media/', move: { scrollbars: true, drag: true, wheel: true } });
   new ResizeObserver(() => Blockly.svgResize(ws)).observe($('blocklyDiv'));
   const code = $('code');
   let manual = store.get('manual', '0') === '1';
