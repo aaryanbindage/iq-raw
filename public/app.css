@@ -129,8 +129,8 @@ button,.button-link { display:inline-flex; align-items:center; justify-content:c
 .focus-mode header h1 { font-size:14px; }
 .focus-mode .brand p,.focus-mode .panel-foot,.focus-mode .connection,.focus-mode #blocks>.panel-heading>span { display:none; }
 .focus-mode .toolbar { padding:4px 10px; gap:6px; }
-.focus-mode .toolbar .button-label,.focus-mode #settingsLink .button-label { display:none; }
-.focus-mode .toolbar button,.focus-mode #settingsLink { width:34px; min-width:34px; padding:6px; }
+.focus-mode .toolbar .button-label,.focus-mode #settingsLink .button-label,.focus-mode #helpLink .button-label { display:none; }
+.focus-mode .toolbar button,.focus-mode #settingsLink,.focus-mode #helpLink { width:34px; min-width:34px; padding:6px; }
 .focus-mode main { padding:6px; gap:6px; min-height:0; grid-template-rows:1fr; }
 .focus-mode .editor-panel { border-radius:8px; }
 .focus-mode .panel-heading { padding:7px 10px; }
@@ -153,3 +153,61 @@ button,.button-link { display:inline-flex; align-items:center; justify-content:c
   background-image:var(--active-pattern);
   background-size:var(--pattern-size);
 }
+
+/* Brain status as a pill: the dot carries state, the text says what to do. */
+.connection { flex-wrap:wrap; }
+#brain { display:inline-flex; align-items:center; gap:8px; padding:4px 12px 4px 10px; border:1px solid var(--line); border-radius:999px; background:var(--panel); color:var(--ink); font-weight:550; }
+#brain::before { content:''; width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+#brain.ok { color:var(--ink); border-color:color-mix(in srgb,var(--good) 45%,var(--line)); }
+#brain.ok::before { background:var(--good); box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 22%,transparent); }
+#brain.bad { color:var(--bad); border-color:color-mix(in srgb,var(--bad) 45%,var(--line)); }
+#brain.bad::before { background:var(--bad); }
+#brain.checking::before { animation:pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity:.25; } }
+.help-link { color:var(--accent); font-weight:600; font-size:12px; text-underline-offset:3px; }
+.help-link:hover { text-decoration-thickness:2px; }
+#log .help-link { font:600 12px/1.6 system-ui,-apple-system,sans-serif; }
+#log .help-link::before { content:'→ '; }
+.activity { display:inline-flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
+.spinner { width:14px; height:14px; border:2px solid color-mix(in srgb,var(--accent) 25%,transparent); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.is-busy #blocklyDiv { cursor:progress; }
+.field-hint { color:var(--bad); font-size:12px; }
+input[aria-invalid="true"] { border-color:var(--bad); box-shadow:0 0 0 1px var(--bad); }
+
+/* Blockly draws the expand arrow from a remote sprite, which is blank offline; use a CSS chevron after the label. */
+#blocklyDiv .blocklyTreeRowContentContainer { width:100%; }
+#blocklyDiv .blocklyTreeIconClosed,#blocklyDiv .blocklyTreeIconOpen { order:2; margin-left:auto; width:16px; height:16px; background:none !important; position:relative; }
+#blocklyDiv .blocklyTreeIconClosed::after,#blocklyDiv .blocklyTreeIconOpen::after { content:''; position:absolute; inset:4px; border:solid var(--muted); border-width:0 2px 2px 0; transform:rotate(-45deg); transition:transform .15s; }
+#blocklyDiv .blocklyTreeIconOpen::after { transform:rotate(45deg); }
+
+/* Help page: the troubleshooting guide. */
+.doc-page main.help-content { display:block; padding:0; gap:0; }
+.help-layout { grid-template-columns:230px minmax(0,780px); }
+.help-nav { max-height:calc(100dvh - 120px); overflow:auto; top:16px; gap:2px; }
+#helpToc { display:flex; flex-direction:column; gap:2px; }
+.help-nav a { padding:7px 10px; font-size:13px; }
+.help-nav a[aria-current] { color:var(--ink); background:var(--panel); box-shadow:inset 3px 0 0 var(--accent); }
+.help-search { display:block; margin-bottom:10px; }
+.help-search input { width:100%; min-height:38px; padding:7px 10px; font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:9px; }
+.help-status { color:var(--muted); font-size:13px; min-height:1.4em; margin:0 0 10px; }
+.doc { padding:28px 32px; line-height:1.65; font-size:15px; }
+.doc h1 { font-size:28px; letter-spacing:-.03em; margin:0 0 8px; }
+.doc section { padding-top:8px; }
+.doc h2 { font-size:20px; letter-spacing:-.02em; margin:28px 0 10px; padding-top:20px; border-top:1px solid var(--line); scroll-margin-top:16px; }
+.doc section:first-of-type h2 { border-top:0; padding-top:0; }
+.doc p,.doc li { max-width:72ch; }
+.doc li { margin:4px 0; }
+.doc li::marker { color:var(--muted); }
+.doc a { color:var(--accent); text-underline-offset:3px; }
+.doc code { font:.88em ui-monospace,Menlo,Consolas,monospace; padding:1px 5px; border-radius:5px; background:color-mix(in srgb,var(--ink) 8%,transparent); overflow-wrap:anywhere; }
+.doc pre { padding:12px 14px; border-radius:9px; background:var(--code); color:var(--codeink); overflow:auto; }
+.doc pre code { padding:0; background:none; }
+.doc :target { animation:flash 1.6s ease-out; }
+@keyframes flash { from { background:color-mix(in srgb,var(--accent) 22%,transparent); } }
+.table-wrap { overflow-x:auto; margin:12px 0; }
+.doc table { border-collapse:collapse; width:100%; font-size:14px; }
+.doc th,.doc td { text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid var(--line); }
+.doc th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+@media(max-width:800px) { .help-nav { max-height:none; flex-direction:column; } .help-nav #helpToc { display:none; } .doc { padding:20px 16px; font-size:14px; } }
+@media(prefers-reduced-motion:reduce) { .spinner,#brain.checking::before,.doc :target { animation:none; } #blocklyDiv .blocklyTreeIconClosed::after { transition:none; } }

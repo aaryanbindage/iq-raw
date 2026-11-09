@@ -1,6 +1,8 @@
 const { StringDecoder } = require('node:string_decoder');
 
 // Only VEXcom's discovered user port may be opened; HTTP callers cannot supply paths.
+// macOS names it /dev/tty.usbmodem…, Linux /dev/ttyACM…, Windows COM….
+const USER_PORT=/^(?:\/dev\/(?:tty|cu)\.usbmodem[\w.-]+|\/dev\/ttyACM\d+|COM\d+)$/;
 function createConsole({ SerialPort, query }) {
   let port=null, opening=null, history='',suspended=0,resume=false;
   const clients=new Set();
@@ -18,7 +20,7 @@ function createConsole({ SerialPort, query }) {
       let info;
       try{info=JSON.parse(result.out.slice(result.out.indexOf('{')));}catch{throw Error(result.out||'The brain did not return its console port.');}
       const device=info.device;
-      if(result.code!==0||device?.connection!=='brain'||!/^\/dev\/(?:tty|cu)\.usbmodem[\w.-]+$/.test(device?.user||'')) throw Error('No IQ brain console port found. Connect the powered-on brain directly by USB, and close VEXcode’s connection.');
+      if(result.code!==0||device?.connection!=='brain'||!USER_PORT.test(device?.user||'')) throw Error('No IQ brain console port found. Connect the powered-on brain directly by USB, and close VEXcode’s connection.');
       const path=device.user.replace('/dev/tty.','/dev/cu.');
       const current=new SerialPort({path,baudRate:115200,parity:'none',stopBits:1,xon:true,xoff:true,autoOpen:false});
       const decoder=new StringDecoder('utf8');port=current;

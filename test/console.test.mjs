@@ -37,6 +37,14 @@ await assert.rejects(service.input('hello'),/Connect/);
 await service.close();
 const bad=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:'{"device":{"connection":"brain","user":"/etc/passwd"}}'})});
 await assert.rejects(bad.connect(),/No IQ brain console port/);
+for(const user of ['COM7','/dev/ttyACM1']){
+  const other=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:JSON.stringify({device:{connection:'brain',user}})})});
+  await other.connect();assert.equal(FakePort.instances.at(-1).options.path,user,user+' should open as-is');await other.close();
+}
+for(const user of ['COM7 ','\\\\.\\COM7','/dev/ttyACM1/../sda','/dev/ttyUSB0']){
+  const other=createConsole({SerialPort:FakePort,query:async()=>({code:0,out:JSON.stringify({device:{connection:'brain',user}})})});
+  await assert.rejects(other.connect(),/No IQ brain console port/,user+' must be refused');
+}
 const dom=new JSDOM('<dl id="monitors" hidden></dl><pre id="log"></pre>',{runScripts:'outside-only'});
 dom.window.eval(fs.readFileSync('public/console-renderer.js','utf8'));
 const root=dom.window.document.getElementById('log'),monitors=dom.window.document.getElementById('monitors'),terminal=dom.window.IQConsole.create(root,monitors);
