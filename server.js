@@ -232,12 +232,16 @@ brain.screen.print("probe done")
 `;
 
 // ---- HTTP ----
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.mjs': 'text/javascript; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.mjs': 'text/javascript; charset=utf-8', '.wasm': 'application/wasm', '.py': 'text/x-python; charset=utf-8', '.json': 'application/json' };
 
-function sendFile(res, file) {
+// Cross-origin isolation lets the Python preview worker sleep and read the brain buttons through shared memory.
+// Everything the page loads is same-origin, so nothing breaks.
+const ISOLATION = { 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' };
+
+function sendFile(res, file, cache = 'no-store') {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404).end('Not found'); return; }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': cache, ...ISOLATION });
     res.end(data);
   });
 }
@@ -344,6 +348,10 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname.startsWith('/vendor/blockly/')) {
     const f = inside(path.join(ROOT, 'node_modules', 'blockly'), url.pathname.slice('/vendor/blockly/'.length));
     return f ? sendFile(res, f) : void res.writeHead(404).end('Not found');
+  }
+  if (url.pathname.startsWith('/vendor/pyodide/')) {
+    const f = inside(path.join(ROOT, 'node_modules', 'pyodide'), url.pathname.slice('/vendor/pyodide/'.length));
+    return f ? sendFile(res, f, 'public, max-age=3600') : void res.writeHead(404).end('Not found');
   }
   const f = inside(path.join(ROOT, 'public'), url.pathname === '/' ? 'index.html' : url.pathname.slice(1));
   return f ? sendFile(res, f) : void res.writeHead(404).end('Not found');

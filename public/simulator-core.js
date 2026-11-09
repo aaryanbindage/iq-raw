@@ -1,5 +1,6 @@
 // Offline block interpreter. Never evaluates Python, C++, or arbitrary JavaScript.
 (function(root){
+  const {Devices}=typeof require!=='undefined'&&typeof module!=='undefined'?require('./simulator-devices'):root.IQSimulatorDevices;
   const child=(b,n)=>b?.inputs?.[n]?.block||b?.inputs?.[n]?.shadow;
   const field=(b,n,d='')=>b?.fields?.[n]??d;
   const variable=b=>{const v=field(b,'VAR');return typeof v==='object'?(v.id||v.name):v;};
@@ -20,6 +21,7 @@
   class Runtime{
     constructor(emit,options={}){
       this.emit=emit;this.limit=options.limit||2000000;this.language=options.language||'python';
+      this.devices=new Devices(emit);
       this.vars=new Map();this.tables=new Map();this.complex=new Map();this.booleans=new Map();this.functions=new Map();
       this.active=true;this.steps=0;this.row=1;this.column=1;this.font=12;this.precision={screen:2,console:2};
       this.buttons={check:false,left:false,right:false};this.handlers=[];this.timers=[];this.started=Date.now();
@@ -98,6 +100,7 @@
       const get=t.match(/^iqv_table_get([12])_(number|text)$/),size=t.match(/^iqv_table_size([12])$/);
       if(get){const table=this.tables.get(f('NAME'))||[],r=get[1]==='1'?1:v('ROW'),c=v('COL'),value=Number.isInteger(r)&&Number.isInteger(c)?table[r-1]?.[c-1]??'':'';return get[2]==='text'?String(value):String(value).trim()===''?NaN:Number(value);}
       if(size){const table=this.tables.get(f('NAME'))||[];return size[1]==='2'&&f('AXIS')==='rows'?table.length:table[0]?.length||0;}
+      const device=this.devices.expression(b,v,f);if(device)return device.value;
       return this.unsupported(b);
     }
     async sleep(ms){const end=Date.now()+Math.max(0,Math.min(3600000,Number(ms)||0));do{if(!this.active)throw HALT;await new Promise(r=>setTimeout(r,Math.min(25,Math.max(0,end-Date.now()))));}while(Date.now()<end);}
@@ -170,6 +173,7 @@
       if(create){const r=create[1]==='1'?1:v('ROWS'),c=v('COLS'),fill=String(v('FILL'));this.tables.set(f('NAME'),Number.isInteger(r)&&Number.isInteger(c)&&r>=0&&c>=0&&r<=64&&c<=64?Array.from({length:r},()=>Array(c).fill(fill)):[]);return;}
       if(set){const a=this.tables.get(f('NAME'))||[],r=set[1]==='1'?1:v('ROW'),c=v('COL');if(Number.isInteger(r)&&Number.isInteger(c)&&r>=1&&c>=1&&r<=a.length&&c<=(a[0]?.length||0))a[r-1][c-1]=String(v('VALUE'));return;}
       if(t==='iqv_list_items'||t==='iqv_matrix_items'){const a=['A','B','C',...(t==='iqv_matrix_items'?['D']:[])].map(n=>String(v(n)));this.tables.set(f('NAME'),t==='iqv_list_items'?[a]:[a.slice(0,2),a.slice(2)]);return;}
+      if(await this.devices.statement(this,b,v,f)!==undefined)return;
       this.unsupported(b);
     }
     stop(){this.active=false;for(const timer of this.timers)clearTimeout(timer);}
@@ -177,6 +181,7 @@
     press(name,down){const changed=this.buttons[name]!==down;this.buttons[name]=down;if(!changed||!this.active)return;if(name==='check')for(const b of this.handlers.filter(b=>b.type===(down?'iq_ev_brain_pressed':'iq_ev_brain_released')))this.stack(child(b,'DO')).catch(error=>this.fail(error));}
     async run(state){
       const blocks=state.blocks?.blocks||[];
+      try{this.devices.scan(blocks);}catch(error){this.fail(error);return;}
       for(const b of blocks){if(b.disabled||b.enabled===false)continue;if(b.type==='procedures_defnoreturn')this.functions.set(field(b,'NAME'),b);if(['iq_ev_brain_pressed','iq_ev_brain_released','iq_ev_brain_timer'].includes(b.type))this.handlers.push(b);}
       for(const b of this.handlers.filter(b=>b.type==='iq_ev_brain_timer'))this.timers.push(setTimeout(()=>{if(this.active)this.stack(child(b,'DO')).catch(error=>this.fail(error));},Math.max(0,Number(field(b,'N',1000)))));
       try{

@@ -57,4 +57,34 @@ screen.draw({op:'origin',x:5,y:10});screen.draw({op:'clip',x:0,y:0,w:80,h:54});s
 assert.ok(calls.some(c=>c[0]==='translate'&&c[1]===5&&c[2]===10));
 assert.ok(calls.some(c=>c[0]==='rect'&&c[3]===80&&c[4]===54));
 const before=calls.length;screen.draw({op:'circle',x:Infinity,y:0,r:10});assert.equal(calls.length,before);
-console.log('ok - offline math/calculus/complex values, control flow, screen graph coordinates/gaps, lists, Check events, cancellation, raw-code rejection and clipping');
+
+// Motors, drivetrain and sound blocks: every mentioned motor is attached before the program runs; moves take real time.
+{
+  events=[];const rt2=new Runtime(e=>events.push(e));
+  await rt2.run(state([
+    {type:'iq_when_started'},
+    {type:'iq_m_set_velocity',fields:{PORT:'4',U:'PERCENT'},inputs:{V:n(100)}},
+    {type:'iq_m_spin_for_units',fields:{PORT:'4',D:'FORWARD',U:'DEGREES',W:'True'},inputs:{V:n(60)}},
+    {type:'iq_s_note',inputs:{O:n(4),N:n(9),D:n(250)}},
+    {type:'iq_s_sound',fields:{S:'SoundType.TADA'}},
+    {type:'iq_motor_setup',fields:{PORT:'9',REV:true}},
+  ]));
+  const motorEvents=events.filter(e=>e.type==='motor');
+  assert.ok(motorEvents.some(e=>e.port===9&&e.reversed===true),'a motor set up but never moved is still announced');
+  assert.ok(motorEvents.some(e=>e.port===4&&e.rate===600&&e.limit===60));
+  assert.equal(rt2.devices.motorPosition(4,'DEGREES'),60,'a blocking spin finishes before the next block');
+  assert.ok(events.some(e=>e.type==='sound'&&e.kind==='note'&&e.name==='A4'&&e.ms===250));
+  assert.ok(events.some(e=>e.type==='sound'&&e.name==='TADA'));
+  assert.equal(events.at(-1).type,'finished');
+
+  events=[];const scanned=new Runtime(e=>events.push(e));
+  await scanned.run(state([{type:'iq_when_started'},{type:'controls_if',inputs:{IF0:{block:{type:'logic_boolean',fields:{BOOL:'FALSE'}}},DO0:{block:{type:'iq_m_spin_dir',fields:{PORT:'12',D:'REVERSE'}}}}}]));
+  assert.ok(events.some(e=>e.type==='motor'&&e.port===12),'a motor inside a block that never runs is still attached');
+  assert.ok(!events.some(e=>e.type==='motor'&&e.rate!==0),'and does not move');
+
+  events=[];const drive=new Runtime(e=>events.push(e));
+  await drive.run(state([{type:'iq_dt_setup',fields:{LP:'1',LREV:false,RP:'6',RREV:true,TRAVEL:200,TRACK:173,BASE:76,UNITS:'MM',GYRO:true}},{type:'iq_dt_drive_for',fields:{D:'FORWARD',U:'MM',W:'True'},inputs:{X:n(200)}}]));
+  assert.ok(events.some(e=>e.type==='motor'&&e.port===1)&&events.some(e=>e.type==='motor'&&e.port===6&&e.reversed));
+  assert.equal(Math.round(drive.devices.motorPosition(1,'DEGREES')),360,'200 mm is one wheel turn with 200 mm wheel travel');
+}
+console.log('ok - offline math/calculus/complex values, control flow, graphs, lists, Check events, cancellation, raw-code rejection, clipping, motor/drivetrain/sound blocks');

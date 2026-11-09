@@ -22,7 +22,7 @@ w.fetch=async()=>({ok:true,json:async()=>({ok:false,out:'No mock brain'})});
 Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async()=>{}}});
 w.document.documentElement.requestFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:w.document.documentElement,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
 w.document.exitFullscreen=async()=>{Object.defineProperty(w.document,'fullscreenElement',{value:null,configurable:true});w.document.dispatchEvent(new w.Event('fullscreenchange'));};
-for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer','transfer-ui','simulator-screen','simulator-ui'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
+for(const file of ['node_modules/blockly/blockly_compressed.js','node_modules/blockly/blocks_compressed.js','node_modules/blockly/python_compressed.js','node_modules/blockly/msg/en.js',...['iq-blocks','iq-cpp','iq-catalog','iq-math','iq-vex','editor-ui','console-renderer','transfer-ui','simulator-screen','simulator-audio','simulator-ui'].map(n=>'public/'+n+'.js')]) w.eval(fs.readFileSync(file,'utf8'));
 w.eval([...w.document.querySelectorAll('script')].find(s=>!s.src).textContent);
 const B=w.Blockly,ws=B.getMainWorkspace(),$=id=>w.document.getElementById(id);
 try{
@@ -90,5 +90,14 @@ try{
   $('simRight').onkeyup(new w.KeyboardEvent('keyup',{key:' '}));
   assert.equal(simulated.messages.at(-2).name,'right');assert.equal(simulated.messages.at(-2).down,true);assert.equal(simulated.messages.at(-1).down,false);
   $('simClose').click();assert.equal(simulated.terminated,true,'Closing preview must terminate its worker');assert.equal(preview.open,false);
+  // Hand-edited Python is what runs when "Edit code by hand" is on; C++ is refused with an explanation.
+  $('manual').checked=true;$('manual').onchange();
+  $('code').value='from vex import *\nbrain = Brain()\nmotor = Motor(Ports.PORT2)\n';
+  $('previewToggle').click();assert.equal($('simRun').textContent,'Run code');
+  $('simRun').click();const handEdited=w.Worker.instances.at(-1);
+  assert.equal(handEdited.messages[0].type,'run-python');assert.ok(handEdited.messages[0].code.includes('Motor(Ports.PORT2)'));
+  const before=w.Worker.instances.length;$('lang').value='cpp';$('lang').onchange();$('simRun').click();
+  assert.equal(w.Worker.instances.length,before,'C++ must not start a worker');assert.ok($('simStatus').textContent.includes('Python'));
+  $('simClose').click();
   console.log('ok - starter persistence, drag-only clicks, drag creation, dot categories, Zelos and fullscreen pane restoration');
 }finally{ws.dispose();dom.window.close();}

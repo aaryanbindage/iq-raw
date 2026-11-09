@@ -71,7 +71,7 @@
 </main>
 <dialog id="brainPreview" aria-labelledby="simTitle">
   <div class="sim-heading"><div><h2 id="simTitle">Brain preview</h2><p>Offline simulator · No brain or USB connection needed</p></div><button id="simClose" type="button" aria-label="Close brain preview">×</button></div>
-  <div class="sim-toolbar"><button id="simRun" class="primary" type="button">Run blocks</button><button id="simStop" type="button" disabled>Stop</button><button id="simReset" type="button">Reset</button><span class="spacer"></span><button id="simEnlarge" type="button" aria-pressed="false">Enlarge screen</button><button id="simSave" type="button">Save screen</button></div>
+  <div class="sim-toolbar"><button id="simRun" class="primary" type="button">Run blocks</button><button id="simStop" type="button" disabled>Stop</button><button id="simReset" type="button">Reset</button><label class="sim-sound"><input type="checkbox" id="simSound" checked> Sound</label><span class="spacer"></span><button id="simEnlarge" type="button" aria-pressed="false">Enlarge screen</button><button id="simSave" type="button">Save screen</button></div>
   <div class="sim-layout">
     <div class="sim-stage"><div id="simDevice" class="sim-device">
       <img src="/assets/iq2-brain-simulator.png" width="1448" height="1086" alt="Realistic illustration of an IQ2 brain with left and right arrows, Check and X buttons">
@@ -81,7 +81,7 @@
       <button id="simCheck" class="sim-device-key" type="button" aria-label="Brain Check button" title="Check: triggers brain-button blocks"></button>
       <button id="simCancel" class="sim-device-key" type="button" aria-label="Brain X: stop preview" title="X: stop preview"></button>
     </div><p class="sim-caption">160 × 108 pixels · Approximate fonts and timing</p></div>
-    <div class="sim-details"><p id="simStatus" role="status">Ready · no brain needed</p><p>Preview screen drawing, graphs, math, variables and loops. Check triggers brain-button blocks; X stops the preview.</p><p>Raw code and physical device behavior aren’t simulated. Unsupported blocks stop with an explanation.</p><button id="simDemo" type="button">Try drawing demo</button><h3>Simulator output</h3><pre id="simLog" tabindex="0" aria-label="Simulator console output"></pre></div>
+    <div class="sim-details"><p id="simStatus" role="status">Ready · no brain needed</p><p>Runs your blocks, or your hand-edited Python when “Edit code by hand” is on. Screen, graphs, math, motors, drivetrain and sound are simulated, and sound plays on this computer. Check triggers brain-button code; X stops the preview.</p><p>Sensors, the controller and C++ aren’t simulated. Unsupported blocks stop with an explanation.</p><button id="simDemo" type="button">Try drawing demo</button><h3>Motors</h3><p id="simNoMotors">No motors attached. Any motor port your program mentions appears here.</p><ul id="simMotors" class="sim-motors" aria-label="Attached motors"></ul><h3>Simulator output</h3><pre id="simLog" tabindex="0" aria-label="Simulator console output"></pre></div>
   </div>
 </dialog>
 <script src="/vendor/blockly/blockly_compressed.js"></script>
@@ -97,6 +97,7 @@
 <script src="/console-renderer.js"></script>
 <script src="/transfer-ui.js"></script>
 <script src="/simulator-screen.js"></script>
+<script src="/simulator-audio.js"></script>
 <script src="/simulator-ui.js"></script>
 <script>
 (() => {
@@ -255,7 +256,7 @@
   $('stop').onclick = () => action('stop', 'stop', {});
   $('vm').onclick = () => confirm('Put the Python VM on the brain now? This takes a minute. Do not unplug it.') && action('install Python VM', 'python-vm', {});
   IQEditor.setup(ws, {api, log});
-  IQSimulator.attach(ws,{isManual:()=>manual,language:()=>lang});
+  IQSimulator.attach(ws,{isManual:()=>manual,language:()=>lang,code:()=>code.value});
   checkBrain();
 })();
 </script>

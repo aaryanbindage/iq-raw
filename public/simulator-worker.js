@@ -1,4 +1,4 @@
-importScripts('/simulator-core.js');
+importScripts('/simulator-devices.js','/simulator-core.js');
 let runtime,draws=[];
 function flush(){if(draws.length){postMessage({type:'draw-batch',commands:draws});draws=[];}}
 function emit(message){if(message.type==='draw'){draws.push(message);if(draws.length>=64)flush();}else{flush();postMessage(message);}}
