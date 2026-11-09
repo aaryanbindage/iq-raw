@@ -198,7 +198,7 @@ The preview and the program tree run your program in the browser, so they need n
 
 **`Run C++ code` asks for setup.** The local app's C++ preview needs a one-time download of the WASI SDK compiler for your system (about 180 MB on macOS and Linux, 590 MB on Windows): run `npm run setup-preview` in the iq-raw folder, then retry. It installs to `~/.iq-raw/preview`.
 
-**`npm run setup-preview` fails.** `checksum did not match` means the download was damaged or incomplete; it is deleted, so run the command again. `extraction failed` on Windows means the built-in `tar.exe` is missing (Windows 10 version 1803 or later has it) or the disk is full. `No C++ preview compiler is published` means your CPU is not x64 or arm64.
+**`npm run setup-preview` fails.** `checksum did not match` means the download was damaged or incomplete; it is deleted, so run the command again. `download failed at byte …` means one part of the file still failed after several retries, usually because the connection dropped; run the command again. `extraction failed` on Windows means the built-in `tar.exe` is missing (Windows 10 version 1803 or later has it) or the disk is full. `No C++ preview compiler is published` means your CPU is not x64 or arm64.
 
 **The web editor's first C++ build is slow.** The hosted editor downloads about 100 MB of compiler files the first time. Later builds reuse them.
 
