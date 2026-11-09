@@ -1,9 +1,24 @@
 # A stand-in for the brain's `vex` module, used by the offline preview. Motors, the drivetrain, sound, the screen and the
 # brain buttons are simulated. Sensors are not: they read as 0 / False. Everything talks to the page through `_sim`.
+import asyncio as _asyncio
 import json as _json
+import traceback as _traceback
 import js as _js
 
+try:
+    from pyodide.ffi import can_run_sync as _can_run_sync, create_proxy as _create_proxy, run_sync as _run_sync
+except ImportError:  # pragma: no cover
+    _can_run_sync = lambda: False
+
 _sim = _js.simBridge
+
+
+def _describe(error):
+    line = getattr(error, "lineno", None) if isinstance(error, SyntaxError) else None
+    for frame in _traceback.extract_tb(error.__traceback__):
+        if frame.filename == "<program>":
+            line = frame.lineno
+    return ("Line %d: " % line if line else "") + type(error).__name__ + ": " + str(error)
 
 
 def _send(**message):
@@ -144,15 +159,24 @@ def _colour(c):
 
 # ---- time ----
 def _sleep_ms(ms):
+    # When the browser supports stack switching, other Threads and events run while this one waits.
+    # Otherwise the wait blocks the whole preview (it still polls the brain buttons).
     ms = max(0.0, float(ms))
     _send(type="flush")
     end = _sim.now() + ms
+    switching = _can_run_sync()
     while True:
         left = end - _sim.now()
-        if left <= 0:
+        if left <= 0 and not (switching and ms == 0):
             break
-        _sim.nap(min(left, 10))
+        chunk = min(max(left, 0), 10)
+        if switching:
+            _run_sync(_asyncio.sleep(chunk / 1000))
+        else:
+            _sim.nap(chunk)
         _poll()
+        if ms == 0:
+            break
 
 
 def wait(time, units=MSEC):
@@ -164,34 +188,51 @@ _press_handlers = []
 _release_handlers = []
 _timer_handlers = []
 _last_check = [False]
-_in_event = [False]
+_live = set()
 
 
 def _poll():
-    if _in_event[0]:
-        return
     down = bool(_sim.button("check"))
     if down != _last_check[0]:
         _last_check[0] = down
-        _run_handlers(_press_handlers if down else _release_handlers)
+        for fn in list(_press_handlers if down else _release_handlers):
+            _spawn(fn)
     now = _sim.now() - _brain_timer_zero[0]
     for h in _timer_handlers:
         if not h[2] and now >= h[1]:
             h[2] = True
-            _run_handlers([h[0]])
-
-
-def _run_handlers(handlers):
-    _in_event[0] = True
-    try:
-        for fn in list(handlers):
-            fn()
-    finally:
-        _in_event[0] = False
+            _spawn(h[0])
 
 
 def _has_handlers():
-    return bool(_press_handlers or _release_handlers or _timer_handlers)
+    return bool(_press_handlers or _release_handlers or _timer_handlers or _live)
+
+
+# ---- threads and events: they run side by side when the browser supports stack switching, one after another otherwise ----
+class _Task:
+    def __init__(self):
+        self.done = False
+
+
+def _spawn(fn, args=()):
+    task = _Task()
+
+    def body():
+        try:
+            fn(*args)
+        except BaseException as error:
+            _send(type="error", message=_describe(error))
+        finally:
+            task.done = True
+            _live.discard(task)
+
+    if _can_run_sync():
+        _live.add(task)
+        _sim.startThread(_create_proxy(body))
+    else:
+        _warn_once("thread", "Note: this browser can't run Threads and events at the same time, so each runs to completion first.")
+        body()
+    return task
 
 
 class Event:
@@ -205,24 +246,40 @@ class Event:
 
     def broadcast(self):
         for fn in list(self._callbacks):
-            fn()
+            _spawn(fn)
 
-    broadcast_and_wait = broadcast
+    def broadcast_and_wait(self):
+        tasks = [_spawn(fn) for fn in list(self._callbacks)]
+        while not all(t.done for t in tasks):
+            _sleep_ms(5)
 
 
 class Thread:
-    """The preview has no real threads: the function runs to completion first, then the program carries on."""
-
     def __init__(self, fn, args=()):
-        _warn_once("thread", "Note: the preview runs a Thread's function to completion before the rest of the program.")
-        self._done = True
-        fn(*args)
+        self._task = _spawn(fn, args)
 
     def stop(self):
         pass
 
     def is_alive(self):
-        return False
+        return not self._task.done
+
+
+class Timer:
+    def __init__(self):
+        self._zero = _sim.now()
+
+    def time(self, units=MSEC):
+        ms = _sim.now() - self._zero
+        return ms / 1000 if str(units).upper().endswith("SECONDS") else ms
+
+    def clear(self):
+        self._zero = _sim.now()
+
+    reset = clear
+
+    def event(self, callback, ms=1000):
+        _timer_handlers.append([callback, ms, False])
 
 
 # ---- devices that are not simulated ----

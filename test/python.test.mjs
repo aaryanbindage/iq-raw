@@ -47,3 +47,17 @@ assert.equal(r.message,'');
 const out=r.events.filter(e=>e.type==='console').map(e=>e.text).join('');
 assert.equal(out,'360 360\n90\nNote: Bumper.pressing is not simulated; it reads as 0 or False.\nFalse\n',out);
 console.log('ok - Python preview: real Python, motors announced and timed, sound events, screen, drivetrain, errors with line numbers');
+
+// Timer exists; without stack switching (Node) a Thread runs to completion first. In a browser they run side by side.
+r=await program(`from vex import *
+brain = Brain()
+t = Timer()
+def short():
+    wait(30, MSEC)
+    print("thread", t.time(MSEC) >= 30)
+Thread(short)
+print("main")
+`);
+assert.equal(r.message,'');
+assert.equal(r.events.filter(e=>e.type==='console'&&!e.text.startsWith('Note')).map(e=>e.text).join(''),'thread True\nmain\n');
+console.log('ok - Timer and Thread fallback');

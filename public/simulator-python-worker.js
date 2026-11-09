@@ -3,6 +3,7 @@ import {loadPyodide} from '/vendor/pyodide/pyodide.mjs';
 import '/simulator-devices.js';
 import '/simulator-python.js';
 self.onmessage=async({data})=>{
+  if(data.type==='button')self.IQSimulatorPython.setButton(data.name,data.down);
   if(data.type!=='run-python')return;
   try{
     const vexSource=await (await fetch('/simulator-vex.py')).text();
