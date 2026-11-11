@@ -24,13 +24,14 @@ try {
 
   // Renderer: GitHub-style slugs, and nothing from the text becomes markup or a script link.
   out.replaceChildren();
-  w.IQMarkdown.render('## Version error (code 3)\n## C++ builds\n## C++ builds\n<img src=x onerror=alert(1)> **bold `code`** [bad](javascript:alert(1)) [ok](https://example.com)\n\n- one\n  continued\n- two\n\n1. first\n\n```\n<b>raw</b>\n```\n\n| a | b |\n|---|---|\n| `x` | y |', out);
+  w.IQMarkdown.render('## Version error (code 3)\n## C++ builds\n## C++ builds\n<img src=x onerror=alert(1)> **bold `code`** [bad](javascript:alert(1)) [ok](https://example.com) [far](//evil.example) [far2](/\\evil.example) [local](/help.html)\n\n- one\n  continued\n- two\n\n1. first\n\n```\n<b>raw</b>\n```\n\n| a | b |\n|---|---|\n| `x` | y |', out);
   assert.deepEqual([...out.querySelectorAll('h2')].map((h) => h.id), ['version-error-code-3', 'c-builds', 'c-builds-1']);
   assert.equal(out.querySelector('img'), null);
   assert.ok(out.textContent.includes('<img src=x onerror=alert(1)>'));
   assert.equal(out.querySelector('strong code').textContent, 'code');
   assert.equal(out.querySelector('a[href^="javascript"]'), null);
   assert.equal(out.querySelector('a[href="https://example.com"]').rel, 'noopener noreferrer');
+  assert.deepEqual([...out.querySelectorAll('a')].map((a) => a.getAttribute('href')), ['https://example.com', '/help.html'], 'protocol-relative //host and /\\host links are dropped');
   assert.equal(out.querySelector('ul').children.length, 2);
   assert.equal(out.querySelector('ul li').textContent, 'one continued');
   assert.equal(out.querySelector('ol li').textContent, 'first');

@@ -19,10 +19,11 @@ assert.equal(new Set(Object.values(HASHES)).size, 6, 'each archive has its own c
 console.log('ok - C++ preview picks the WASI SDK for macOS, Windows and Linux on x64 and arm64');
 
 validate('#include "vex.h"\n#include <cmath>\nint main() { return 0; }');
-for (const bad of ['#include "secret.txt"', '#include </etc/passwd>', '#include MACRO', '#import "x"', 'asm("nop");', '__asm__("nop");', '.incbin "x"', '#if __has_embed("x")\n#endif', '']) {
+for (const bad of ['#include "secret.txt"', '#include </etc/passwd>', '#include MACRO', '#import "x"', 'asm("nop");', '__asm__("nop");', '.incbin "x"', '#if __has_embed("x")\n#endif', '%:include "/etc/passwd"', ' %: include <C:/secret.txt>', '#if __has_include("/etc/passwd")\n#endif', '#if __has_include_next(<x>)\n#endif', '_Pragma("clang system_header")', '']) {
   assert.throws(() => validate(bad), Error, JSON.stringify(bad) + ' must be refused');
 }
-console.log('ok - preview source checks refuse host files, assembly and empty code');
+validate('#include <cstdio>\nint main() { std::printf("50%% done\\n"); return 0; }');
+console.log('ok - preview source checks refuse host files (including digraph and __has_include), assembly and empty code');
 
 const sdk = wasiSdk();
 if (!sdk || !fs.existsSync(sdk.clang)) console.log('skip - C++ preview compiler not installed (npm run setup-preview)');

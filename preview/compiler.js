@@ -4,6 +4,9 @@ const headers=new Set(['vex.h','stdint.h','cstdint','stddef.h','cstddef','stdio.
 function validate(code){
   if(typeof code!=='string'||!code.trim()||code.length>200000)throw Error('Preview requires nonempty code, at most 200000 characters.');
   const normalized=code.replace(/\\\r?\n/g,'').replace(/\/\*[\s\S]*?\*\//g,' ');
+  // Only #-lines are checked below, so the other spellings of a directive are refused outright: the %: digraph for #,
+  // __has_include (which probes host files) and _Pragma (the operator form of #pragma).
+  if(/%:|\b__has_include|\b_Pragma\b/.test(normalized))throw Error('Code preview does not accept %: digraphs, __has_include or _Pragma. Write directives with #.');
   for(const line of normalized.split(/\r?\n/)){
     const directive=line.match(/^\s*#\s*(\w+)(.*)$/);if(!directive)continue;
     const [,name,args]=directive;
@@ -14,7 +17,6 @@ function validate(code){
   }
   if(/\b(?:asm|__asm|__asm__)\b|\.incbin|__has_embed/.test(normalized))throw Error('Assembly and embedded host files are unavailable in code preview.');
 }
-function sdk(){return require('./wasi-sdk').wasiSdk()?.folder||null;}
 function execute(bin,args,{cwd,env=process.env,timeout=30000}={}){
   return new Promise(resolve=>{
     const child=spawn(bin,args,{cwd,env});let out='';let ended=false;
@@ -57,4 +59,4 @@ async function compile(code){
     return {ok:true,wasm:fs.readFileSync(path.join(dir,'preview.wasm')).toString('base64'),out:result.out.trim()};
   }finally{building=false;fs.rmSync(dir,{recursive:true,force:true});}
 }
-module.exports={compile,validate,sdk};
+module.exports={compile,validate};

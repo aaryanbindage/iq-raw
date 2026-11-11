@@ -7,5 +7,6 @@ walk(path.join(sdk,'include'),'sdk/include');walk(path.join(sdk,'gcc/include'),'
 for(const name of ['libviq2rt.a','lscript.ld','license.pdf'])files['sdk/'+name]=fs.readFileSync(path.join(sdk,name)).toString('base64');
 for(const name of ['libc_nano.a','libstdc++_nano.a','libm.a','libgcc.a'])files['sdk/gcc/libs/'+name]=fs.readFileSync(path.join(sdk,'gcc/libs',name)).toString('base64');
 const template=findTemplate();if(!template)throw Error('The IQ2 C++ project template from the VEX VS Code extension was not found. Reinstall the extension.');
-files['include/vex.h']=readZipEntry(template,'include/vex.h').toString('base64');
+const vexHeader=readZipEntry(template,'include/vex.h');if(!vexHeader)throw Error(`include/vex.h is missing from the VEX project template ${template}. Reinstall the VEX VS Code extension.`);
+files['include/vex.h']=vexHeader.toString('base64');
 const target=path.resolve(process.argv[2]||'public/compiler/iq2-sdk.json.gz');fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,zlib.gzipSync(JSON.stringify({version,files}),{level:9}));console.log('Packed '+Object.keys(files).length+' IQ2 SDK files: '+fs.statSync(target).size+' bytes');

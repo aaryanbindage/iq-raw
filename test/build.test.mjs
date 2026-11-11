@@ -94,7 +94,13 @@ if (/^make/i.test(path.basename(process.execPath))) {
   assert.equal(packed.version, 'V1_0_0');
   assert.equal(Buffer.from(packed.files['include/vex.h'], 'base64').toString(), '#pragma once\n');
   for (const key of ['sdk/libviq2rt.a', 'sdk/include/v5_api.h', 'sdk/gcc/include/stdio.h', 'sdk/gcc/libs/libgcc.a']) assert.ok(packed.files[key], key + ' should be packed');
-  console.log('ok - packs the web compiler SDK bundle from the VEX install on this OS');
+  // A template without vex.h is reported by name rather than as a TypeError.
+  fs.writeFileSync(template, makeZip([['makefile', 'all:\n', true]]));
+  const broken = spawnSync(process.execPath, ['scripts/pack-iq2-sdk.mjs', bundle], { env: { ...process.env, HOME: home, USERPROFILE: home, VEX_STORAGE: storage }, encoding: 'utf8' });
+  assert.notEqual(broken.status, 0);
+  assert.match(broken.stderr, /include\/vex\.h is missing from the VEX project template/);
+  assert.doesNotMatch(broken.stderr, /TypeError/);
+  console.log('ok - packs the web compiler SDK bundle from the VEX install on this OS, and names a template missing vex.h');
 } finally {
   server?.kill();
   fs.rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

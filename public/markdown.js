@@ -3,7 +3,8 @@
   // Text is only ever set through textContent, and links are limited to http(s), same-site paths and #anchors.
   // Heading ids follow GitHub's rule, so #anchors work both here and on GitHub.
   const slug = (text) => text.trim().toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
-  const safeHref = (href) => (/^(https?:\/\/|\/|#)/i.test(href) ? href : null);
+  // External links must say https?:; a bare / must not start //host or /\host, which browsers treat as external too.
+  const safeHref = (href) => (/^(https?:\/\/|\/(?![\/\\])|#)/i.test(href) ? href : null);
 
   function inline(doc, parent, text) {
     const pattern = /`([^`]+)`|\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
